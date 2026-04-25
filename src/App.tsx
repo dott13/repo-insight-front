@@ -3,28 +3,27 @@ import { routeTree } from "./routeTree.gen";
 import "./App.css";
 import { useAuth } from "./hooks/useAuth";
 import { AuthShell } from "./components/auth/AuthShell";
-import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
-import { useEffect } from "react";
+import { useMemo, useState } from "react";
+import { TopBar } from "./components/layout/TopBar";
+import { SideBar } from "./components/layout/SideBar";
 
-const router = createRouter({ routeTree });
 
 
 declare module "@tanstack/react-router" {
   export interface Register {
-    router: typeof router;
+    router: ReturnType<typeof createRouter>;
   }
 }
 
 function App() {
   const { user, loading } = useAuth();
+  const [ isSidebarOpen, setIsSidebarOpen ] = useState(false);
 
-  useEffect(() => {
-  onOpenUrl((urls) => {
-    console.log("deep link received:", urls);
-    alert(JSON.stringify(urls)); // ugly but confirms it works
-  });
-}, []);
-
+  const router = useMemo(
+    () => createRouter({ routeTree, context: { user: user ?? null } }),
+    [user]
+  );
+  
   if (loading) {
     return <div className="h-screen flex items-center justify-center bg-zinc-950 text-zinc-500">Initializing...</div>;
   }
@@ -35,7 +34,21 @@ function App() {
       </div>
     );
   }
-  return <RouterProvider router={router} context={{user}}/>;
+
+
+  return(
+    <div className="min-h-screen bg-zinc-950 flex flex-col overflow-hidden">
+      <TopBar onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}/>
+      <div className="flex flex-1 overflow-hidden">
+        <SideBar isOpen={isSidebarOpen} /> 
+        <main className="flex-1 overflow-y-auto bg-zinc-950">
+          <div className="p-6 max-w-[1600px] mx-auto">
+            <RouterProvider router={router} />
+          </div>
+        </main>
+      </div>
+    </div>
+  );
 }
 
 export default App;

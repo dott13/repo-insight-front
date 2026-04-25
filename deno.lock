@@ -16,6 +16,7 @@
     "npm:@vitejs/plugin-react@^4.6.0": "4.7.0_vite@7.3.1",
     "npm:class-variance-authority@~0.7.1": "0.7.1",
     "npm:clsx@^2.1.1": "2.1.1",
+    "npm:lucide-react@^1.11.0": "1.11.0_react@19.2.4",
     "npm:radix-ui@^1.4.3": "1.4.3_@types+react@19.2.14_@types+react-dom@19.2.3__@types+react@19.2.14_react@19.2.4_react-dom@19.2.4__react@19.2.4",
     "npm:react-dom@^19.1.0": "19.2.4_react@19.2.4",
     "npm:react-icons@^5.6.0": "5.6.0_react@19.2.4",
@@ -3089,6 +3090,12 @@
         "yallist"
       ]
     },
+    "lucide-react@1.11.0_react@19.2.4": {
+      "integrity": "sha512-UOhjdztXCgdBReRcIhsvz2siIBogfv/lhJEIViCpLt924dO+GDms9T7DNoucI23s6kEPpe988m5N0D2ajnzb2g==",
+      "dependencies": [
+        "react"
+      ]
+    },
     "magic-string@0.30.21": {
       "integrity": "sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==",
       "dependencies": [
@@ -4101,6 +4108,7 @@
         "npm:@vitejs/plugin-react@^4.6.0",
         "npm:class-variance-authority@~0.7.1",
         "npm:clsx@^2.1.1",
+        "npm:lucide-react@^1.11.0",
         "npm:radix-ui@^1.4.3",
         "npm:react-dom@^19.1.0",
         "npm:react-icons@^5.6.0",

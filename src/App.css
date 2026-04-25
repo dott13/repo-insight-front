@@ -238,3 +238,20 @@ button {
     
   }
 }
+
+.sidebar-transition {
+  transition: width 0.3s ease;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.sidebar-closed {
+  width: 0px;
+  opacity: 0;
+  border-right-width: 0px;
+}
+
+sidebar-open {
+  width: 16rem;
+  opacity: 1;
+}
