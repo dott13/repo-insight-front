@@ -1,10 +1,10 @@
-import { createRootRoute, Outlet } from "@tanstack/react-router";
+import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
+import { User } from "@supabase/supabase-js";
 
-export const Route = createRootRoute({
-  component: () => (
-    <div className="min-h-screen bg-zinc-950 text-zinc-50 font-sans">
+interface RouterContext {
+  user: User | null;
+}
 
-      <Outlet />
-    </div>
-  ),
+export const Route = createRootRouteWithContext<RouterContext>()({
+  component: () => <Outlet />,
 });
