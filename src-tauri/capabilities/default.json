@@ -8,6 +8,15 @@
   "permissions": [
     "core:default",
     "opener:default",
-    "deep-link:default"
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://*.supabase.co/*"
+        }
+      ]
+    },
+    "deep-link:default",
+    "shell:default"
   ]
 }
