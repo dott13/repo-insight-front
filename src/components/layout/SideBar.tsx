@@ -10,9 +10,9 @@ const navItems = [
 export function SideBar({ isOpen }: { isOpen: boolean }) {
     return (
         <aside
-            className={`sidebar-transition border-zinc-800 bg-zinc-950 flex flex-col h-full border-r ${isOpen ? 'sidebar-open' : 'sidebar-closed'}`}
+            className={`sidebar-transition border-zinc-800 bg-zinc-950 border-r ${isOpen ? 'sidebar-open' : 'sidebar-closed'}`}
         >
-            <div className="w-64 flex flex-col h-full">
+            <div className="w-64 flex flex-col h-full justify-between">
                 <nav className="flex-1 px-3 py-4 space-y-1">
                     {navItems.map((item) => (
                         <Link
@@ -27,7 +27,7 @@ export function SideBar({ isOpen }: { isOpen: boolean }) {
                         </Link>
                     ))}
                 </nav>
-                <div className="p-4 border-t border-zinc-800">
+                <div className="p-4 mt-auto border-t border-zinc-800">
                     <Link
                         to="/settings"
                         activeProps={{ className: "text-white" }}
