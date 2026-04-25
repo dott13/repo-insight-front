@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { useAuth } from "@/hooks/useAuth.tsx";
+import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase.ts";
 
 interface TopBarProps {
