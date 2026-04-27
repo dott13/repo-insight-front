@@ -7,28 +7,17 @@ import { UpdateRepoDto } from './dto/update-repo.dto';
 export class ReposController {
   constructor(private readonly reposService: ReposService) {}
 
-  @Post()
-  create(@Body() createRepoDto: CreateRepoDto) {
-    return this.reposService.create(createRepoDto);
+  @Post('repos')
+  async syncProjects( @Body() body: {
+    paths: string[],
+    email: string, 
+    token?: string,
+    allEmails?: string[] }) {
+      return this.reposService.syncUserProjects(body.paths, body.email, body.token, body.allEmails);
   }
 
-  @Get()
-  findAll() {
-    return this.reposService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.reposService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateRepoDto: UpdateRepoDto) {
-    return this.reposService.update(+id, updateRepoDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.reposService.remove(+id);
-  }
+  @Post(':id/parse')
+  async parseRepo(@Param('id') id: string, @Body('email') email: string) {
+    return { message: "Parsing started", id };
+  } 
 }
