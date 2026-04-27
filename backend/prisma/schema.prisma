@@ -1,0 +1,37 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+// prisma/schema.prisma
+
+model Repository {
+  id                String   @id @default(uuid())
+  name              String
+  fullName          String   @map("full_name")
+  isLocal           Boolean  @default(false)
+  isRemote          Boolean  @default(false)
+  provider          String   // 'github', 'gitlab', etc.
+  externalId        String?  @unique
+  localUrl          String?  @unique // Absolute path on disk
+  htmlUrl           String?
+  description       String?
+  isContributed     Boolean  @default(false)
+  contributionScore Int      @default(0)
+  lastParsed        DateTime @default(now())
+  
+  userId            String
+  createdAt         DateTime @default(now())
+
+  @@unique([fullName, userId], name: "fullName_userId")
+}
