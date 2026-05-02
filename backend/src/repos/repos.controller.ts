@@ -7,7 +7,7 @@ import { UpdateRepoDto } from './dto/update-repo.dto';
 export class ReposController {
   constructor(private readonly reposService: ReposService) {}
 
-  @Post('repos')
+  @Post('sync')
   async syncProjects( @Body() body: {
     paths: string[],
     email: string, 
