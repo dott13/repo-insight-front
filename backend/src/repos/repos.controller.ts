@@ -11,9 +11,10 @@ export class ReposController {
   async syncProjects( @Body() body: {
     paths: string[],
     email: string, 
+    deviceId: string,
     token?: string,
     allEmails?: string[] }) {
-      return this.reposService.syncUserProjects(body.paths, body.email, body.token, body.allEmails);
+      return this.reposService.syncUserProjects(body.paths, body.email, body.deviceId, body.token, body.allEmails);
   }
 
   @Post(':id/parse')
