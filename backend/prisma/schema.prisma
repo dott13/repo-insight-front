@@ -23,7 +23,7 @@ model Repository {
   isRemote          Boolean  @default(false)
   provider          String   // 'github', 'gitlab', etc.
   externalId        String?  @unique
-  localUrl          String?  @unique // Absolute path on disk
+  localPaths        Json?    @default("{}")
   htmlUrl           String?
   description       String?
   isContributed     Boolean  @default(false)
