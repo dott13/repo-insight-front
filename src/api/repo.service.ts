@@ -12,7 +12,7 @@ export const repoService = {
 
         const localPaths = await invoke<string[]>("run_git_scan", {
             basePath: baseDir,
-            user_emails: searchEmails
+            userEmails: searchEmails
         });
 
         const res = await fetch(`${import.meta.env.VITE_API_URL}/repos/sync`, {

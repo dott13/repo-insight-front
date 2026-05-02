@@ -1,11 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { CreateRepoDto } from './dto/create-repo.dto';
 import { UpdateRepoDto } from './dto/update-repo.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { Octokit } from 'octokit';
 import { GitParserService } from './git-parser.service';
 import { Repo } from './entities/repo.entity';
-import { Repository } from '../generated/prisma';
+import { Repository } from '@prisma/client';
 
 @Injectable()
 export class ReposService {
@@ -14,7 +14,10 @@ export class ReposService {
     private readonly gitParser: GitParserService
   ) {}
 
+  private readonly logger = new Logger(ReposService.name);
+
   async syncUserProjects(localPaths: string[], userEmail: string, deviceId: string, gitHubToken?: string, allUserEmails: string[] = []) {
+    this.logger.log(`Starting sync for user ${userEmail} with ${localPaths.length} local paths and GitHub token: ${!!gitHubToken}`);
     const projectMap = new Map<string, Partial<Repo> & { currentPath?: string }>();
     const searchEmails = allUserEmails.length > 0 ? allUserEmails : [userEmail];
     
@@ -40,11 +43,12 @@ export class ReposService {
         }
       } catch (e) {
         console.error('Remote sync failed, proceeding with local only.');
+        this.logger.error(`GitHub sync failed for user ${userEmail}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
-
+    
     for (const path of localPaths) {
-
+    this.logger.debug(`Processing path: ${path}`);
       const isOwner = await this.gitParser.isUserProject(path, searchEmails);
       if (!isOwner) continue;
 
@@ -109,5 +113,6 @@ export class ReposService {
       });
       results.push(saved);
     }
+    this.logger.log(`Sync completed.`)
   }
 }
