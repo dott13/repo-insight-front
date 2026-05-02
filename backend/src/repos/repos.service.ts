@@ -14,8 +14,8 @@ export class ReposService {
     private readonly gitParser: GitParserService
   ) {}
 
-  async syncUserProjects(localPaths: string[], userEmail: string, gitHubToken?: string, allUserEmails: string[] = []) {
-    const projectMap = new Map<string, Partial<Repo>>();
+  async syncUserProjects(localPaths: string[], userEmail: string, deviceId: string, gitHubToken?: string, allUserEmails: string[] = []) {
+    const projectMap = new Map<string, Partial<Repo> & { currentPath?: string }>();
     const searchEmails = allUserEmails.length > 0 ? allUserEmails : [userEmail];
     
     if (gitHubToken) {
@@ -44,6 +44,10 @@ export class ReposService {
     }
 
     for (const path of localPaths) {
+
+      const isOwner = await this.gitParser.isUserProject(path, searchEmails);
+      if (!isOwner) continue;
+
       const metadata = await this.gitParser.parseLocalMetadata(path);
       if (!metadata) continue;
 
@@ -54,7 +58,7 @@ export class ReposService {
       if (projectMap.has(fullName)) { 
         const existing = projectMap.get(fullName)!;
         existing.isLocal = true;
-        existing.localUrl = path;
+        existing.currentPath = path;
       } else {
         projectMap.set(fullName, {
           name: metadata.name,
@@ -62,7 +66,7 @@ export class ReposService {
           isLocal: true,
           isRemote: false,
           provider: 'local',
-          localUrl: path,
+          currentPath: path,
           htmlUrl: metadata.remoteUrl,
           isContributed: false,
         });
@@ -71,12 +75,21 @@ export class ReposService {
 
     const results: Repository[] = [];
     for (const [fullName, p] of projectMap) {
+      const existingRecord = await this.prisma.repository.findUnique({
+        where: { fullName_userId: { fullName: p.full_name!, userId: userEmail } },
+      });
+
+      const mergedPaths = (existingRecord?.localPaths as Record<string, string>) || {};
+      if (p.currentPath) {
+        mergedPaths[deviceId] = p.currentPath;
+      }
+
       const saved = await this.prisma.repository.upsert({
         where: { fullName_userId: { fullName: p.full_name!, userId: userEmail } },
         update: {
           isLocal: p.isLocal,
           isRemote: p.isRemote,
-          localUrl: p.localUrl,
+          localPaths: mergedPaths,
           externalId: p.externalId,
         },
         create: {
@@ -86,7 +99,7 @@ export class ReposService {
           isLocal: p.isLocal!,
           isRemote: p.isRemote!,
           externalId: p.externalId,
-          localUrl: p.localUrl,
+          localPaths: mergedPaths,
           htmlUrl: p.htmlUrl,
           description: p.description,
           userId: userEmail,

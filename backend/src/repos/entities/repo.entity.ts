@@ -6,7 +6,7 @@ export class Repo {
   isRemote!: boolean;
   provider!: 'local' | 'github' | 'gitlab';
   externalId?: string;
-  localUrl?: string;
+  localPaths?: Record<string, string>;
   htmlUrl?: string; 
   description?: string;
   isContributed!: boolean;
