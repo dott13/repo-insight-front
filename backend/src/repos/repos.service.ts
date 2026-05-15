@@ -1,11 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CreateRepoDto } from './dto/create-repo.dto';
-import { UpdateRepoDto } from './dto/update-repo.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { Octokit } from 'octokit';
 import { GitParserService } from './git-parser.service';
 import { Repo } from './entities/repo.entity';
 import { Repository } from '@prisma/client';
+import { SyncReposDto } from './dto/sync-repo.dto';
 
 @Injectable()
 export class ReposService {
@@ -16,7 +15,8 @@ export class ReposService {
 
   private readonly logger = new Logger(ReposService.name);
 
-  async syncUserProjects(localPaths: string[], userEmail: string, deviceId: string, gitHubToken?: string, allUserEmails: string[] = []) {
+  async syncUserProjects(dto: SyncReposDto) {
+    const { localPaths, userEmail, deviceId, gitHubToken, allUserEmails = [] } = dto;
     this.logger.log(`Starting sync for user ${userEmail} with ${localPaths.length} local paths and GitHub token: ${!!gitHubToken}`);
     const projectMap = new Map<string, Partial<Repo> & { currentPath?: string }>();
     const searchEmails = allUserEmails.length > 0 ? allUserEmails : [userEmail];
@@ -113,6 +113,7 @@ export class ReposService {
       });
       results.push(saved);
     }
-    this.logger.log(`Sync completed.`)
+    this.logger.log(`Sync completed for ${projectMap.size} projects.`);
+    return results;
   }
 }
