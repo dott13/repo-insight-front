@@ -34,7 +34,7 @@ function App() {
       };
       initializeData();
     }
-  }, [user, hasSynced, isSyncing]);
+  }, [user, hasSynced]);
 
   if (authLoading) {
     return <div className="h-screen flex items-center justify-center bg-zinc-950 text-zinc-500">Initializing...</div>;

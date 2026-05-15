@@ -35,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const params = new URLSearchParams(fragment);
             const accessToken = params.get("access_token");
             const refreshToken = params.get("refresh_token");
+            const providerToken = params.get("provider_token");
             if (accessToken && refreshToken) {
                 const { error } = await supabase.auth.setSession({
                     access_token: accessToken,
@@ -42,6 +43,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 });
                 if (error) console.error("Error setting session from deep link:", error);
             }   
+
+            if (providerToken) {
+                    localStorage.setItem("provider_token", providerToken);
+            }
         });
 
         return () => {
