@@ -3,37 +3,51 @@ import { invoke } from "@tauri-apps/api/core";
 import { supabase } from "@/lib/supabase";
 
 export const repoService = {
-    async syncLocalRepos(user: any) {
-        const { data: { session } } = await supabase.auth.getSession();
-        const gitHubToken = session?.provider_token ?? localStorage.getItem("provider_token");
-        const searchEmails = [
-            user.email,
-            ...(user.user_metadata?.secondary_emails || [])
-        ].filter(Boolean);
+  async syncLocalRepos(user: any) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const gitHubToken =
+      session?.provider_token ?? localStorage.getItem("provider_token");
+    const searchEmails = [
+      user.email,
+      ...(user.user_metadata?.secondary_emails || []),
+    ].filter(Boolean);
 
-        const baseDir = await homeDir();
+    const baseDir = await homeDir();
 
-        const localPaths = await invoke<string[]>("run_git_scan", {
-            basePath: baseDir,
-            userEmails: searchEmails
-        });
-        console.log("baseDir:", baseDir);
-        console.log("Found local paths:", localPaths);
+    const localPaths = await invoke<string[]>("run_git_scan", {
+      basePath: baseDir,
+      userEmails: searchEmails,
+    });
+    console.log("baseDir:", baseDir);
+    console.log("Found local paths:", localPaths);
 
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/repos/sync`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-            localPaths, 
-            userEmail: user.email, 
-            deviceId: "tauri-device",
-            gitHubToken,
-            allUserEmails: searchEmails 
-            }),
-        });
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/repos/sync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        localPaths,
+        userEmail: user.id,
+        userId: user.id,
+        userLogin:
+          user.user_metadata?.preffered_username ??
+          user.user_metadata?.user_name,
+        deviceId: "tauri-device",
+        gitHubToken,
+        allUserEmails: searchEmails,
+      }),
+    });
 
-        const text = await res.text();
-        if (!res.ok) throw new Error(`Server Error (${res.status}): ${text}`);
-        return JSON.parse(text);
-    }
-}
+    const text = await res.text();
+    if (!res.ok) throw new Error(`Server Error (${res.status}): ${text}`);
+    return JSON.parse(text);
+  },
+
+  async getRepos(userId: string) {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/repos/${userId}`);
+    const text = await res.text();
+    if (!res.ok) throw new Error(`Server Error (${res.status}): ${text}`);
+    return JSON.parse(text);
+  },
+};
