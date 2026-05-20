@@ -3,6 +3,8 @@
 
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
+// prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,26 +13,140 @@ datasource db {
   provider = "postgresql"
 }
 
-
-// prisma/schema.prisma
-
 model Repository {
   id                String   @id @default(uuid())
   name              String
   fullName          String   @map("full_name")
   isLocal           Boolean  @default(false)
   isRemote          Boolean  @default(false)
-  provider          String   // 'github', 'gitlab', etc.
+  provider          String
   externalId        String?  @unique
   localPaths        Json?    @default("{}")
   htmlUrl           String?
   description       String?
   isContributed     Boolean  @default(false)
   contributionScore Int      @default(0)
+
+  // Aggregate PR stats (denormalized for quick queries)
+  totalPRs          Int      @default(0)
+  mergedPRs         Int      @default(0)
+  openPRs           Int      @default(0)
+  closedPRs         Int      @default(0)
+  prMergeRate       Float    @default(0) // mergedPRs / totalPRs as %
+
+  // Aggregate commit stats across all branches
+  totalCommits      Int      @default(0)
+  totalAdditions    Int      @default(0)
+  totalDeletions    Int      @default(0)
+
   lastParsed        DateTime @default(now())
-  
   userId            String
   createdAt         DateTime @default(now())
 
+  branches          Branch[]
+  pullRequests      PullRequest[]
+  commitStats       CommitStat[]
+  contributors      Contributor[]
+  prReviewStats     PRReviewStat[]
+
   @@unique([fullName, userId], name: "fullName_userId")
+}
+
+model Branch {
+  id              String   @id @default(uuid())
+  name            String
+  isDefault       Boolean  @default(false)
+  isProtected     Boolean  @default(false)
+
+  // User's contribution to this specific branch
+  userCommits     Int      @default(0)
+  totalCommits    Int      @default(0)
+  commitPercent   Float    @default(0) // userCommits / totalCommits as %
+
+  userAdditions   Int      @default(0)
+  userDeletions   Int      @default(0)
+
+  lastCommitAt    DateTime?
+  createdAt       DateTime @default(now())
+
+  repositoryId    String
+  repository      Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  pullRequests    PullRequest[]
+
+  @@unique([repositoryId, name])
+}
+
+model PullRequest {
+  id              String   @id @default(uuid())
+  externalId      Int      // GitHub PR number
+  title           String
+  state           String   // 'open', 'closed', 'merged'
+  isDraft         Boolean  @default(false)
+
+  additions       Int      @default(0)
+  deletions       Int      @default(0)
+  changedFiles    Int      @default(0)
+  commitsInPR     Int      @default(0)
+
+  createdAt       DateTime
+  updatedAt       DateTime
+  mergedAt        DateTime?
+  closedAt        DateTime?
+
+  // Relations
+  repositoryId    String
+  repository      Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  targetBranchId  String?
+  targetBranch    Branch?    @relation(fields: [targetBranchId], references: [id], onDelete: SetNull)
+
+  @@unique([repositoryId, externalId])
+}
+
+model CommitStat {
+  id            String   @id @default(uuid())
+  week          DateTime // start of the ISO week (GitHub uses Unix timestamp)
+  additions     Int      @default(0)
+  deletions     Int      @default(0)
+  commits       Int      @default(0)
+
+  repositoryId  String
+  repository    Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, week])
+}
+
+model Contributor {
+  id              String   @id @default(uuid())
+  login           String
+  avatarUrl       String?
+  
+  totalCommits    Int      @default(0)
+  totalAdditions  Int      @default(0)
+  totalDeletions  Int      @default(0)
+  commitPercent   Float    @default(0)  // their share of repo commits
+  
+  firstCommitAt   DateTime?
+  lastCommitAt    DateTime?
+  
+  repositoryId    String
+  repository      Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, login])
+}
+
+model PRReviewStat {
+  id              String   @id @default(uuid())
+  
+  reviewerLogin   String
+  reviewCount     Int      @default(0)
+  approvalsGiven  Int      @default(0)
+  commentsGiven   Int      @default(0)
+  avgTimeToReview Float?   // hours from PR open to first review
+  
+  repositoryId    String
+  repository      Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, reviewerLogin])
 }

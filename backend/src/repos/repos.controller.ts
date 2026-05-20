@@ -11,8 +11,8 @@ export class ReposController {
       return this.reposService.syncUserProjects(dto);
   }
 
-  @Post(':id/parse')
-  async parseRepo(@Param('id') id: string, @Body('email') email: string) {
-    return { message: "Parsing started", id };
-  } 
+  @Get()
+  async getRepos( @Param('userId') userId: string) {
+      return this.reposService.getUserRepos(userId);
+  }
 }
