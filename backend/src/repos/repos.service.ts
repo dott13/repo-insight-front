@@ -1,24 +1,24 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { Octokit } from 'octokit';
-import { GitParserService } from './git-parser.service';
-import { Repo } from './entities/repo.entity';
-import { Repository } from '@prisma/client';
-import { SyncReposDto } from './dto/sync-repo.dto';
 import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
+import { Octokit } from 'octokit';
+import { PrismaService } from '../prisma/prisma.service';
+import { GitParserService } from './git-parser.service';
+import { SyncReposDto } from './dto/sync-repo.dto';
+import { Repo } from './entities/repo.entity';
+import { Repository } from '@prisma/client';
 
 @Injectable()
 export class ReposService {
-  constructor(
-    private prisma: PrismaService,
-    private readonly gitParser: GitParserService,
-    @InjectQueue('repos') private reposQueue: Queue,
-  ) {}
-
   private readonly logger = new Logger(ReposService.name);
 
-  async syncUserProjects(dto: SyncReposDto) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly gitParser: GitParserService,
+    @InjectQueue('repos') private readonly reposQueue: Queue,
+  ) {}
+
+  async syncUserProjects(dto: SyncReposDto): Promise<Repository[]> {
     const {
       localPaths,
       userEmail,
@@ -28,21 +28,21 @@ export class ReposService {
       gitHubToken,
       allUserEmails = [],
     } = dto;
+
     this.logger.log(
-      `Starting sync for user ${userEmail} with ${localPaths.length} local paths and GitHub token: ${!!gitHubToken}`,
+      `Starting sync for user ${userEmail} — ${localPaths.length} local paths, GitHub: ${!!gitHubToken}`,
     );
 
-    const projectMap = new Map<
-      string,
-      Partial<Repo> & { currentPath?: string }
-    >();
+    const projectMap = new Map<string, Partial<Repo> & { currentPath?: string }>();
     const searchEmails = allUserEmails.length > 0 ? allUserEmails : [userEmail];
 
+    // Fetch remote repos from GitHub
     if (gitHubToken) {
       try {
         const octokit = new Octokit({ auth: gitHubToken });
         const { data } = await octokit.rest.repos.listForAuthenticatedUser({
           affiliation: 'owner,collaborator,organization_member',
+          per_page: 100,
         });
 
         for (const r of data) {
@@ -58,16 +58,18 @@ export class ReposService {
             isContributed: r.permissions?.push || false,
           });
         }
+        this.logger.log(`Fetched ${data.length} remote repos from GitHub`);
       } catch (e) {
-        console.error('Remote sync failed, proceeding with local only.');
         this.logger.error(
-          `GitHub sync failed for user ${userEmail}: ${e instanceof Error ? e.message : String(e)}`,
+          `GitHub remote sync failed for ${userEmail}: ${e instanceof Error ? e.message : String(e)}`,
         );
       }
     }
 
+    // Scan local paths
     for (const path of localPaths) {
-      this.logger.debug(`Processing path: ${path}`);
+      this.logger.debug(`Scanning local path: ${path}`);
+
       const isOwner = await this.gitParser.isUserProject(path, searchEmails);
       if (!isOwner) continue;
 
@@ -98,12 +100,12 @@ export class ReposService {
 
     const results: Repository[] = [];
     for (const [, p] of projectMap) {
-      const existingRecord = await this.prisma.repository.findUnique({
+      const existing = await this.prisma.repository.findUnique({
         where: { fullName_userId: { fullName: p.full_name!, userId } },
+        select: { localPaths: true },
       });
 
-      const mergedPaths =
-        (existingRecord?.localPaths as Record<string, string>) || {};
+      const mergedPaths = (existing?.localPaths as Record<string, string>) || {};
       if (p.currentPath) {
         mergedPaths[deviceId] = p.currentPath;
       }
@@ -115,6 +117,8 @@ export class ReposService {
           isRemote: p.isRemote,
           localPaths: mergedPaths,
           externalId: p.externalId,
+          ...(p.description !== undefined && { description: p.description }),
+          ...(p.htmlUrl !== undefined && { htmlUrl: p.htmlUrl }),
         },
         create: {
           name: p.name!,
@@ -126,34 +130,50 @@ export class ReposService {
           localPaths: mergedPaths,
           htmlUrl: p.htmlUrl,
           description: p.description,
-          userId: userId,
+          userId,
           isContributed: p.isContributed || false,
           contributionScore: 0,
         },
       });
+
       results.push(saved);
     }
 
     if (gitHubToken && userLogin) {
-      await this.reposQueue.add('calculate-scores', {
-        userId,
-        gitHubToken,
-        userLogin,
-        repos: results
-          .filter(r => r.isRemote)
-          .map((r) => ({ id: r.id, fullName: r.fullName })),
-      });
-      this.logger.log(`Enqueued score calculation for ${results.length} repositories.`);
+      const remoteRepos = results
+        .filter(r => r.isRemote)
+        .map(r => ({ id: r.id, fullName: r.fullName }));
+
+      if (remoteRepos.length > 0) {
+        await this.reposQueue.add(
+          'calculate-scores',
+          { userId, gitHubToken, userLogin, repos: remoteRepos },
+          {
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 5000 },
+            removeOnComplete: true,
+            removeOnFail: false,
+          },
+        );
+
+        this.logger.log(`Enqueued deep sync for ${remoteRepos.length} remote repos`);
+      }
     }
 
-    this.logger.log(`Sync completed for ${projectMap.size} projects.`);
+    this.logger.log(`Sync complete — ${projectMap.size} projects found`);
     return results;
   }
 
-  async getUserRepos(userId: string) {
+  async getUserRepos(userId: string): Promise<Repository[]> {
     return this.prisma.repository.findMany({
       where: { userId },
       orderBy: { contributionScore: 'desc' },
+    });
+  }
+
+  async getRepo(repoId: string, userId: string): Promise<Repository | null> {
+    return this.prisma.repository.findFirst({
+      where: { id: repoId, userId },
     });
   }
 }
