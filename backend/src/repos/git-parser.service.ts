@@ -18,11 +18,11 @@ export class GitParserService {
     }
   }
 
-  async parseLocalMetadata(path: string) { 
+  async parseLocalMetadata(path: string) {
     const git: SimpleGit = simpleGit(path);
     try {
-      const remote = await git.remote(["get-url", "origin"]);
-      const stats = await git.raw(["rev-list", "--count", "HEAD"]);
+      const remote = await git.remote(['get-url', 'origin']);
+      const stats = await git.raw(['rev-list', '--count', 'HEAD']);
       return {
         name: path.split('/').pop() || 'unknown',
         remoteUrl: remote?.trim(),
@@ -33,7 +33,6 @@ export class GitParserService {
     }
   }
 
-  // Helper to normalize Git URLs into "owner/repo"
   extractFullName(url: string): string {
     const cleanUrl = url.replace(/\.git$/, '').replace(/\/$/, '');
     const parts = cleanUrl.split(/[:/]/);
