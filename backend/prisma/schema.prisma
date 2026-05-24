@@ -20,7 +20,7 @@ model Repository {
   isLocal           Boolean  @default(false)
   isRemote          Boolean  @default(false)
   provider          String
-  externalId        String?  @unique
+  externalId        String?
   localPaths        Json?    @default("{}")
   htmlUrl           String?
   description       String?

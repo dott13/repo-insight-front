@@ -1,5 +1,2 @@
-import { repoService } from "./repo.service";
-
-export const api = {
-    repos: repoService
-}
+export { repoService } from "./repo.service";
+export type { Repository } from "./repo.service";

@@ -10,6 +10,7 @@ import { BranchesModule } from './branches/branches.module';
 import { PullRequestsModule } from './pull-requests/pull-requests.module';
 import { CommitStatsModule } from './commit-stats/commit-stats.module';
 import { AnalysisModule } from './analysis/analysis.module';
+import { HomeModule } from './home/home.module';
 
 @Module({
   imports: [
@@ -25,7 +26,8 @@ import { AnalysisModule } from './analysis/analysis.module';
     BranchesModule,
     PullRequestsModule,
     CommitStatsModule,
-    AnalysisModule],
+    AnalysisModule,
+    HomeModule],
   controllers: [AppController],
   providers: [PrismaService, AppService],
 })
