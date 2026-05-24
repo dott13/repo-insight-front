@@ -35,14 +35,20 @@ export class ReposGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
   emitScoreUpdate(userId: string, repoId: string): void {
     const socketId = this.userSockets.get(userId);
-    if (!socketId) return;
+    if (!socketId) {
+    this.logger.warn(`No socket found for user ${userId} — emit dropped`); // ← add this
+    return;
+  }
 
     this.server.to(socketId).emit('repo:synced', { repoId });
     this.logger.debug(`Emitted repo:synced → user ${userId}, repo ${repoId}`);
   }
   emitSyncComplete(userId: string, totalRepos: number): void {
     const socketId = this.userSockets.get(userId);
-    if (!socketId) return;
+    if (!socketId) {
+    this.logger.warn(`No socket found for user ${userId} — emit dropped`); // ← add this
+    return;
+  }
 
     this.server.to(socketId).emit('sync:complete', { totalRepos });
   }

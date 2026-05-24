@@ -27,7 +27,13 @@ export class ReposProcessor {
     private readonly branchesService: BranchesService,
     private readonly pullRequestsService: PullRequestsService,
     private readonly commitStatsService: CommitStatsService,
-  ) {}
+  ) {
+    this.logger.log(`Gateway injected: ${!!this.gateway}`);
+    this.logger.log(`ContributorsService injected: ${!!this.contributorsService}`);
+    this.logger.log(`BranchesService injected: ${!!this.branchesService}`);
+    this.logger.log(`PullRequestsService injected: ${!!this.pullRequestsService}`);
+    this.logger.log(`CommitStatsService injected: ${!!this.commitStatsService}`);
+  }
 
   @Process('calculate-scores')
   async handleScoreCalculation(job: Job<RepoJobData>): Promise<void> {
