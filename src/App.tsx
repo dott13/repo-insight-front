@@ -14,7 +14,7 @@ declare module "@tanstack/react-router" {
   }
 }
 
-const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const SYNC_INTERVAL_MS = 4 * 60 * 60 * 1000; // 5 minutes
 
 function App() {
   const { user, loading: authLoading, syncState } = useAuth();

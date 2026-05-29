@@ -18,21 +18,21 @@ export class BranchesService {
   constructor(private readonly prisma: PrismaService) {}
 
   // Sync
-
   async syncForRepo(dto: SyncBranchesDto): Promise<void> {
-    const { repositoryId, fullName, gitHubToken, userLogin, defaultBranch } = dto;
+    const { repositoryId, fullName, gitHubToken, userLogin, defaultBranch } =
+      dto;
     const [owner, repo] = fullName.split('/');
     const octokit = new Octokit({ auth: gitHubToken });
 
-    this.logger.log(`Syncing branches for ${fullName}`);
+    this.logger.log(`Deep syncing all branches exhaustively for ${fullName}`);
 
-    const { data: branches } = await octokit.rest.repos.listBranches({
+    // Paginate through ALL available branches
+    const branches = await octokit.paginate(octokit.rest.repos.listBranches, {
       owner,
       repo,
       per_page: 100,
     });
 
-    // Process branches sequentially to stay within GitHub rate limits
     for (const branch of branches) {
       try {
         await this.syncSingleBranch({
@@ -44,8 +44,10 @@ export class BranchesService {
           repositoryId,
           defaultBranch,
         });
-      } catch (e) {
-        this.logger.warn(`Skipping branch ${branch.name} for ${fullName}: ${e}`);
+      } catch (e: any) {
+        this.logger.warn(
+          `Skipping branch ${branch.name} for ${fullName}: ${e.message}`,
+        );
       }
     }
 
@@ -61,50 +63,53 @@ export class BranchesService {
     repositoryId: string;
     defaultBranch: string;
   }): Promise<void> {
-    const { octokit, owner, repo, branch, userLogin, repositoryId, defaultBranch } = params;
-
-    // Total commits — GitHub paginates so we parse the Link header for count
-    const totalCommitsRes = await octokit.rest.repos.listCommits({
+    const {
+      octokit,
       owner,
       repo,
-      sha: branch.name,
-      per_page: 1,
-    });
-    const totalCommits = this.parseTotalFromLink(
-      (totalCommitsRes as any).headers?.link ?? '',
-    ) || totalCommitsRes.data.length;
-
-    // User commits on this branch (last 100 — enough for percent calculation)
-    const userCommitsRes = await octokit.rest.repos.listCommits({
-      owner,
-      repo,
-      sha: branch.name,
-      author: userLogin,
-      per_page: 100,
-    });
-
-    const userCommits = userCommitsRes.data.length;
-
-    // Fetch detailed stats for the 5 most recent user commits only
-    // Fetching all would burn rate limit budget fast
+      branch,
+      userLogin,
+      repositoryId,
+      defaultBranch,
+    } = params;
+    const allBranchCommits = await octokit.paginate(
+      octokit.rest.repos.listCommits,
+      {
+        owner,
+        repo,
+        sha: branch.name,
+        per_page: 100,
+      },
+    );
+    const totalCommits = allBranchCommits.length;
+    const userCommitsList = allBranchCommits.filter(
+      (c) =>
+        c.author?.login?.toLowerCase() === userLogin.toLowerCase() ||
+        c.commit?.author?.name?.toLowerCase() === userLogin.toLowerCase(),
+    );
+    const userCommits = userCommitsList.length;
     let userAdditions = 0;
     let userDeletions = 0;
-    for (const commit of userCommitsRes.data.slice(0, 5)) {
+
+    if (userCommitsList.length > 0) {
       try {
-        const { data } = await octokit.rest.repos.getCommit({
+        const { data: headDetail } = await octokit.rest.repos.getCommit({
           owner,
           repo,
-          ref: commit.sha,
+          ref: userCommitsList[0].sha,
         });
-        userAdditions += data.stats?.additions ?? 0;
-        userDeletions += data.stats?.deletions ?? 0;
-      } catch { /* skip */ }
+        userAdditions = headDetail.stats?.additions ?? 0;
+        userDeletions = headDetail.stats?.deletions ?? 0;
+      } catch {
+        /* Fail-silent to keep sync active */
+      }
     }
 
     const commitPercent =
-      totalCommits > 0 ? Math.round((userCommits / totalCommits) * 10000) / 100 : 0;
-
-    const lastCommit = userCommitsRes.data[0];
+      totalCommits > 0
+        ? Math.round((userCommits / totalCommits) * 10000) / 100
+        : 0;
+    const lastCommit = userCommitsList[0] || allBranchCommits[0];
     const lastCommitAt = lastCommit?.commit?.author?.date
       ? new Date(lastCommit.commit.author.date)
       : null;
@@ -136,8 +141,7 @@ export class BranchesService {
     });
   }
 
-  //Reads 
-
+  // Reads
   async getBranches(
     repositoryId: string,
     dto: GetBranchesDto,
@@ -149,14 +153,22 @@ export class BranchesService {
     const orderBy = { [dto.sortBy ?? BranchSortField.USER_COMMITS]: 'desc' };
 
     const [branches, total] = await Promise.all([
-      this.prisma.branch.findMany({ where, orderBy, skip: dto.skip, take: dto.limit }),
+      this.prisma.branch.findMany({
+        where,
+        orderBy,
+        skip: dto.skip,
+        take: dto.limit,
+      }),
       this.prisma.branch.count({ where }),
     ]);
 
     return PaginatedResponseDto.of(branches.map(this.toDto), total, dto);
   }
 
-  async getBranch(branchId: string, userId: string): Promise<BranchResponseDto> {
+  async getBranch(
+    branchId: string,
+    userId: string,
+  ): Promise<BranchResponseDto> {
     const branch = await this.prisma.branch.findFirst({
       where: { id: branchId, repository: { userId } },
     });
@@ -177,8 +189,10 @@ export class BranchesService {
       }),
     ]);
 
-    if (!branchA) throw new NotFoundException(`Branch ${dto.branchAId} not found`);
-    if (!branchB) throw new NotFoundException(`Branch ${dto.branchBId} not found`);
+    if (!branchA)
+      throw new NotFoundException(`Branch ${dto.branchAId} not found`);
+    if (!branchB)
+      throw new NotFoundException(`Branch ${dto.branchBId} not found`);
 
     const userCommitsDelta = branchA.userCommits - branchB.userCommits;
     const commitPercentDelta =
@@ -199,33 +213,19 @@ export class BranchesService {
     };
   }
 
-  //Helpers
-
-  private parseTotalFromLink(link: string): number {
-    const match = link.match(/page=(\d+)>; rel="last"/);
-    return match ? parseInt(match[1], 10) : 0;
-  }
-
-  private async assertOwnership(repositoryId: string, userId: string): Promise<void> {
+  private async assertOwnership(
+    repositoryId: string,
+    userId: string,
+  ): Promise<void> {
     const repo = await this.prisma.repository.findFirst({
       where: { id: repositoryId, userId },
       select: { id: true },
     });
-    if (!repo) throw new NotFoundException(`Repository ${repositoryId} not found`);
+    if (!repo)
+      throw new NotFoundException(`Repository ${repositoryId} not found`);
   }
 
-  private toDto(b: {
-    id: string;
-    name: string;
-    isDefault: boolean;
-    isProtected: boolean;
-    userCommits: number;
-    totalCommits: number;
-    commitPercent: number;
-    userAdditions: number;
-    userDeletions: number;
-    lastCommitAt: Date | null;
-  }): BranchResponseDto {
+  private toDto(b: any): BranchResponseDto {
     return {
       id: b.id,
       name: b.name,

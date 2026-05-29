@@ -1,6 +1,6 @@
-import { Repository } from '@/api/repo.service';
 import { RepoCard } from '@/components/shared/RepoCard'
 import { useHomeHighlights } from '@/hooks/useHomeService';
+import { useNavigate } from '@tanstack/react-router';
 
 function HighlightSkeleton() {
   return (
@@ -14,7 +14,8 @@ function HighlightSkeleton() {
 
 export function HighlightsSection() {
   const { highlights, isFetching } = useHomeHighlights();
- 
+  const navigate = useNavigate();
+
   return (
     <section className="h-1/3 p-6 border-b border-zinc-800 bg-zinc-900/50">
       <div className="max-w-7xl mx-auto h-full">
@@ -35,17 +36,20 @@ export function HighlightsSection() {
                 name={highlights.mostCommits.fullName}
                 qualifier={highlights.mostCommits.qualifier}
                 metric={highlights.mostCommits.metric}
+                onClick={() => navigate({to: "/repos/$repoId", params: { repoId: highlights.mostCommits.repoId.toString() }})}
               />
               <RepoCard
                 name={highlights.topScore.fullName}
                 qualifier={highlights.topScore.qualifier}
                 metric={highlights.topScore.metric}
+                onClick={() => navigate({to: "/repos/$repoId", params: { repoId: highlights.topScore.repoId.toString() }})}
               />
               {highlights.bestMergeRate ? (
                 <RepoCard
                   name={highlights.bestMergeRate.fullName}
                   qualifier={highlights.bestMergeRate.qualifier}
-                  metric={highlights.bestMergeRate.metric}  
+                  metric={highlights.bestMergeRate.metric} 
+                  onClick={() => navigate({to: "/repos/$repoId", params: { repoId: highlights.bestMergeRate!.repoId.toString() }})}
                 />
               ) : (
                 <RepoCard

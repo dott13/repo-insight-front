@@ -11,6 +11,7 @@ import { PullRequestsModule } from './pull-requests/pull-requests.module';
 import { CommitStatsModule } from './commit-stats/commit-stats.module';
 import { AnalysisModule } from './analysis/analysis.module';
 import { HomeModule } from './home/home.module';
+import { SharedModule } from './shared/shared.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { HomeModule } from './home/home.module';
         port: parseInt(process.env.REDIS_PORT || '6379', 10),
       },
     }),
+    SharedModule,
     ReposModule,
     ContributorsModule,
     BranchesModule,

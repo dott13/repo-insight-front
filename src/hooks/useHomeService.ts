@@ -22,7 +22,10 @@ export function useHomeTable() {
   const fetchPage = useCallback(async (p: number, replace = false) => {
     setIsFetching(true);
     try {
-      const res: PaginatedRows = await homeService.getTableRows(p, DEFAULT_LIMIT);
+      const res: PaginatedRows = await homeService.getTableRows(
+        p,
+        DEFAULT_LIMIT,
+      );
       setRows((prev) => (replace ? res.data : [...prev, ...res.data]));
       setTotal(res.total);
       setHasMore(res.hasMore);
@@ -42,9 +45,23 @@ export function useHomeTable() {
   // When sync completes, refresh from page 1 to pick up new scores/dates
   useEffect(() => {
     if (!socket) return;
-    const handler = () => fetchPage(1, true);
-    socket.on("sync:complete", handler);
-    return () => { socket.off("sync:complete", handler); };
+
+    // Handler for single repo completions
+    const handleRepoSynced = (data: { repoId: string }) => {
+      console.debug(`[useHomeTable] Real-time update for repo: ${data.repoId}`);
+      // Silent background refresh of page 1 to push fresh data into view
+      fetchPage(1, true);
+    };
+
+    const handleSyncComplete = () => fetchPage(1, true);
+
+    socket.on("repo:synced", handleRepoSynced);
+    socket.on("sync:complete", handleSyncComplete);
+
+    return () => {
+      socket.off("repo:synced", handleRepoSynced);
+      socket.off("sync:complete", handleSyncComplete);
+    };
   }, [socket, fetchPage]);
 
   const loadMore = useCallback(() => {
@@ -78,9 +95,21 @@ export function useHomeHighlights() {
   // Re-fetch when sync completes so metrics update with fresh data
   useEffect(() => {
     if (!socket) return;
-    socket.on("sync:complete", fetch);
-    return () => { socket.off("sync:complete", fetch); };
-  }, [socket, fetch]);
 
+    const handleUpdate = () => {
+      console.debug(
+        "[useHomeHighlights] Sync update received, refreshing highlights...",
+      );
+      fetch();
+    };
+
+    socket.on("repo:synced", handleUpdate);
+    socket.on("sync:complete", handleUpdate);
+
+    return () => {
+      socket.off("repo:synced", handleUpdate);
+      socket.off("sync:complete", handleUpdate);
+    };
+  }, [socket, fetch]);
   return { highlights, isFetching };
 }

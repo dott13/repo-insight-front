@@ -5,11 +5,12 @@ interface RepoCardProps {
   qualifier: string
   metric: string
   variant?: "default" | "secondary" | "outline"
+  onClick?: () => void
 }
 
-export function RepoCard({ name, qualifier, metric, variant = "secondary" }: RepoCardProps) {
+export function RepoCard({ name, qualifier, metric, variant = "secondary", onClick }: RepoCardProps) {
   return (
-    <Card className="hover:border-primary transition-all cursor-pointer bg-zinc-900/50 border-zinc-800 h-full">
+    <Card className="hover:border-primary transition-all cursor-pointer bg-zinc-900/50 border-zinc-800 h-full" onClick={onClick}>
       <CardHeader className="space-y-1">
         <div className="flex justify-between items-start gap-2">
             <CardTitle className="text-sm font-mono break-all leading-tight text-zinc-200">

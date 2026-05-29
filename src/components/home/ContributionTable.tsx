@@ -95,6 +95,7 @@ export function ContributionTable() {
               {rows.map((row) => (
                 <RepoRow key={row.id} row={row} />
               ))}
+              
               {isFetching && rows.length === 0 && (
                 <>
                   <RowSkeleton />
@@ -140,7 +141,12 @@ function RepoRow({ row }: { row: RepoTableRow;}) {
   return (
     <TableRow
       className="border-zinc-800 hover:bg-zinc-800/40 cursor-pointer transition-colors"
-      onClick={() => navigate({to: `/repos/${row.id}`})}
+      onClick={() => 
+        navigate({
+          to: "/repos/$repoId",
+          params: { repoId: row.id.toString() }
+        })
+      }
     >
       <TableCell>
         <div className="flex flex-col">

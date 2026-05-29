@@ -11,8 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as GraphRouteImport } from './routes/graph'
-import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ReposRepoIdRouteImport } from './routes/repos.$repoId'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -24,49 +24,49 @@ const GraphRoute = GraphRouteImport.update({
   path: '/graph',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReposRepoIdRoute = ReposRepoIdRouteImport.update({
+  id: '/repos/$repoId',
+  path: '/repos/$repoId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
   '/graph': typeof GraphRoute
   '/settings': typeof SettingsRoute
+  '/repos/$repoId': typeof ReposRepoIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
   '/graph': typeof GraphRoute
   '/settings': typeof SettingsRoute
+  '/repos/$repoId': typeof ReposRepoIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
   '/graph': typeof GraphRoute
   '/settings': typeof SettingsRoute
+  '/repos/$repoId': typeof ReposRepoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/graph' | '/settings'
+  fullPaths: '/' | '/graph' | '/settings' | '/repos/$repoId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/graph' | '/settings'
-  id: '__root__' | '/' | '/dashboard' | '/graph' | '/settings'
+  to: '/' | '/graph' | '/settings' | '/repos/$repoId'
+  id: '__root__' | '/' | '/graph' | '/settings' | '/repos/$repoId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  DashboardRoute: typeof DashboardRoute
   GraphRoute: typeof GraphRoute
   SettingsRoute: typeof SettingsRoute
+  ReposRepoIdRoute: typeof ReposRepoIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -85,13 +85,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GraphRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -99,14 +92,21 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/repos/$repoId': {
+      id: '/repos/$repoId'
+      path: '/repos/$repoId'
+      fullPath: '/repos/$repoId'
+      preLoaderRoute: typeof ReposRepoIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  DashboardRoute: DashboardRoute,
   GraphRoute: GraphRoute,
   SettingsRoute: SettingsRoute,
+  ReposRepoIdRoute: ReposRepoIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
