@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Octokit } from 'octokit';
+import { GithubStatsService } from '../shared/github-stats.service';
 import {
   GetCommitStatsDto,
   SyncCommitStatsDto,
@@ -16,10 +17,12 @@ import { PaginatedResponseDto } from '../common/dto/pagination.dto';
 export class CommitStatsService {
   private readonly logger = new Logger(CommitStatsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly githubStats: GithubStatsService
+  ) {}
 
   // Sync
-
   async syncForRepo(dto: SyncCommitStatsDto): Promise<void> {
     const { repositoryId, fullName, gitHubToken } = dto;
     const [owner, repo] = fullName.split('/');
@@ -27,7 +30,7 @@ export class CommitStatsService {
 
     this.logger.log(`Syncing commit stats for ${fullName}`);
 
-    const stats = await this.fetchWithRetry(octokit, owner, repo, fullName);
+    const stats = await this.githubStats.getContributorStats(octokit, owner, repo);
     if (!stats.length) return;
 
     const weekMap = new Map<number, { additions: number; deletions: number; commits: number }>();
@@ -72,7 +75,6 @@ export class CommitStatsService {
   }
 
   // Reads
-
   async getCommitStats(
     repositoryId: string,
     dto: GetCommitStatsDto,
@@ -103,7 +105,6 @@ export class CommitStatsService {
   async getSummary(repositoryId: string, userId: string): Promise<CommitStatSummaryDto> {
     await this.assertOwnership(repositoryId, userId);
 
-    // Fetch all to compute summary this is bounded (52 weeks/yr max meaningful range)
     const stats = await this.prisma.commitStat.findMany({
       where: { repositoryId },
       orderBy: { week: 'asc' },
@@ -142,7 +143,6 @@ export class CommitStatsService {
       seriesB = this.aggregateToMonth(seriesB);
     }
 
-    // Align both series to the same time keys fill missing weeks with zeros
     const allKeys = new Set([
       ...seriesA.map(s => s.week.toISOString()),
       ...seriesB.map(s => s.week.toISOString()),
@@ -183,7 +183,6 @@ export class CommitStatsService {
   }
 
   // Shared logic
-
   private buildSummary(stats: CommitStatResponseDto[]): CommitStatSummaryDto {
     if (!stats.length) {
       return {
@@ -245,30 +244,6 @@ export class CommitStatsService {
     return where;
   }
 
-  private async fetchWithRetry(
-    octokit: Octokit,
-    owner: string,
-    repo: string,
-    fullName: string,
-  ): Promise<any[]> {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const res = await octokit.rest.repos.getContributorsStats({ owner, repo });
-
-        if (res.status === 202) {
-          this.logger.debug(`GitHub computing stats for ${fullName}, retry ${attempt + 1}/3`);
-          await new Promise(r => setTimeout(r, 3000 * (attempt + 1)));
-          continue;
-        }
-
-        return Array.isArray(res.data) ? res.data : [];
-      } catch (e) {
-        this.logger.error(`Commit stats fetch failed for ${fullName} (attempt ${attempt + 1}): ${e}`);
-      }
-    }
-    return [];
-  }
-
   private async assertOwnership(repositoryId: string, userId: string): Promise<void> {
     const repo = await this.prisma.repository.findFirst({
       where: { id: repositoryId, userId },
@@ -277,13 +252,7 @@ export class CommitStatsService {
     if (!repo) throw new NotFoundException(`Repository ${repositoryId} not found`);
   }
 
-  private toDto(s: {
-    id: string;
-    week: Date;
-    additions: number;
-    deletions: number;
-    commits: number;
-  }): CommitStatResponseDto {
+  private toDto(s: any): CommitStatResponseDto {
     return {
       id: s.id,
       week: s.week,

@@ -10,6 +10,7 @@ import { ContributorsModule } from '../contributors/contributors.module';
 import { BranchesModule } from '../branches/branches.module';
 import { PullRequestsModule } from '../pull-requests/pull-requests.module';
 import { CommitStatsModule } from '../commit-stats/commit-stats.module';
+import { SharedModule } from '../shared/shared.module';
 
 @Module({
   imports: [

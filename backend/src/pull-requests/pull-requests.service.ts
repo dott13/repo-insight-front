@@ -20,31 +20,46 @@ export class PullRequestsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  //Sync
-
+  // Sync
   async syncForRepo(dto: SyncPullRequestsDto): Promise<void> {
     const { repositoryId, fullName, gitHubToken } = dto;
     const [owner, repo] = fullName.split('/');
     const octokit = new Octokit({ auth: gitHubToken });
 
-    this.logger.log(`Syncing pull requests for ${fullName}`);
+    this.logger.log(`Syncing all historical pull requests for ${fullName}`);
 
-    const [openPRs, closedPRs] = await Promise.all([
-      octokit.rest.pulls.list({ owner, repo, state: 'open', per_page: 100 }),
-      octokit.rest.pulls.list({ owner, repo, state: 'closed', per_page: 100 }),
-    ]);
+    // Exhaustive pagination capturing all historical iterations
+    const allPRs = await octokit.paginate(octokit.rest.pulls.list, {
+      owner,
+      repo,
+      state: 'all',
+      per_page: 100,
+    });
 
-    const allPRs = [...openPRs.data, ...closedPRs.data];
     const reviewStats = new Map<
       string,
-      { reviews: number; approvals: number; comments: number; firstReviewMs: number[] }
+      {
+        reviews: number;
+        approvals: number;
+        comments: number;
+        firstReviewMs: number[];
+      }
     >();
 
     for (const pr of allPRs) {
       try {
-        await this.syncSinglePR({ octokit, owner, repo, pr, repositoryId, reviewStats });
-      } catch (e) {
-        this.logger.warn(`Skipping PR #${pr.number} for ${fullName}: ${e}`);
+        await this.syncSinglePR({
+          octokit,
+          owner,
+          repo,
+          pr,
+          repositoryId,
+          reviewStats,
+        });
+      } catch (e: any) {
+        this.logger.warn(
+          `Skipping PR #${pr.number} for ${fullName}: ${e.message}`,
+        );
       }
     }
 
@@ -57,7 +72,9 @@ export class PullRequestsService {
         : null;
 
       await this.prisma.pRReviewStat.upsert({
-        where: { repositoryId_reviewerLogin: { repositoryId, reviewerLogin: login } },
+        where: {
+          repositoryId_reviewerLogin: { repositoryId, reviewerLogin: login },
+        },
         update: {
           reviewCount: stats.reviews,
           approvalsGiven: stats.approvals,
@@ -75,7 +92,9 @@ export class PullRequestsService {
       });
     }
 
-    this.logger.log(`Synced ${allPRs.length} PRs for ${fullName}`);
+    this.logger.log(
+      `Synced ${allPRs.length} total pull requests for ${fullName}`,
+    );
   }
 
   private async syncSinglePR(params: {
@@ -84,11 +103,18 @@ export class PullRequestsService {
     repo: string;
     pr: any;
     repositoryId: string;
-    reviewStats: Map<string, { reviews: number; approvals: number; comments: number; firstReviewMs: number[] }>;
+    reviewStats: Map<
+      string,
+      {
+        reviews: number;
+        approvals: number;
+        comments: number;
+        firstReviewMs: number[];
+      }
+    >;
   }): Promise<void> {
     const { octokit, owner, repo, pr, repositoryId, reviewStats } = params;
 
-    // Ensure target branch row exists so FK resolves
     const targetBranch = await this.prisma.branch.upsert({
       where: { repositoryId_name: { repositoryId, name: pr.base.ref } },
       update: {},
@@ -101,7 +127,6 @@ export class PullRequestsService {
 
     const isMerged = !!pr.merged_at;
 
-    // Fetch detailed PR for line counts (not in list response)
     const { data: detail } = await octokit.rest.pulls.get({
       owner,
       repo,
@@ -109,7 +134,9 @@ export class PullRequestsService {
     });
 
     await this.prisma.pullRequest.upsert({
-      where: { repositoryId_externalId: { repositoryId, externalId: pr.number } },
+      where: {
+        repositoryId_externalId: { repositoryId, externalId: pr.number },
+      },
       update: {
         state: isMerged ? PRState.MERGED : pr.state,
         additions: detail.additions ?? 0,
@@ -139,7 +166,6 @@ export class PullRequestsService {
       },
     });
 
-    // Accumulate reviewer stats from reviews on this PR
     const { data: reviews } = await octokit.rest.pulls.listReviews({
       owner,
       repo,
@@ -164,7 +190,6 @@ export class PullRequestsService {
       if (review.state === 'APPROVED') existing.approvals++;
       if (review.state === 'COMMENTED') existing.comments++;
 
-      // Track time-to-first-review per PR per reviewer
       if (!seenReviewers.has(login) && review.submitted_at) {
         const reviewedAt = new Date(review.submitted_at).getTime();
         existing.firstReviewMs.push(reviewedAt - prCreatedAt);
@@ -176,7 +201,6 @@ export class PullRequestsService {
   }
 
   // Reads
-
   async getPullRequests(
     repositoryId: string,
     dto: GetPullRequestsDto,
@@ -195,14 +219,22 @@ export class PullRequestsService {
     const orderBy = { [dto.sortBy ?? PRSortField.CREATED]: 'desc' };
 
     const [prs, total] = await Promise.all([
-      this.prisma.pullRequest.findMany({ where, orderBy, skip: dto.skip, take: dto.limit }),
+      this.prisma.pullRequest.findMany({
+        where,
+        orderBy,
+        skip: dto.skip,
+        take: dto.limit,
+      }),
       this.prisma.pullRequest.count({ where }),
     ]);
 
     return PaginatedResponseDto.of(prs.map(this.toPRDto), total, dto);
   }
 
-  async getSummary(repositoryId: string, userId: string): Promise<PRSummaryDto> {
+  async getSummary(
+    repositoryId: string,
+    userId: string,
+  ): Promise<PRSummaryDto> {
     await this.assertOwnership(repositoryId, userId);
 
     const prs = await this.prisma.pullRequest.findMany({
@@ -217,9 +249,9 @@ export class PullRequestsService {
     });
 
     const total = prs.length;
-    const merged = prs.filter(p => p.state === PRState.MERGED);
-    const open = prs.filter(p => p.state === PRState.OPEN).length;
-    const closed = prs.filter(p => p.state === PRState.CLOSED).length;
+    const merged = prs.filter((p) => p.state === PRState.MERGED);
+    const open = prs.filter((p) => p.state === PRState.OPEN).length;
+    const closed = prs.filter((p) => p.state === PRState.CLOSED).length;
 
     const avgAdditions = total
       ? Math.round(prs.reduce((s, p) => s + p.additions, 0) / total)
@@ -228,7 +260,7 @@ export class PullRequestsService {
       ? Math.round(prs.reduce((s, p) => s + p.deletions, 0) / total)
       : 0;
 
-    const mergedWithTimes = merged.filter(p => p.mergedAt);
+    const mergedWithTimes = merged.filter((p) => p.mergedAt);
     const avgTimeToMergeHours = mergedWithTimes.length
       ? mergedWithTimes.reduce(
           (s, p) => s + (p.mergedAt!.getTime() - p.createdAt.getTime()),
@@ -243,7 +275,8 @@ export class PullRequestsService {
       openPRs: open,
       mergedPRs: merged.length,
       closedPRs: closed,
-      mergeRate: total > 0 ? Math.round((merged.length / total) * 10000) / 100 : 0,
+      mergeRate:
+        total > 0 ? Math.round((merged.length / total) * 10000) / 100 : 0,
       avgAdditions,
       avgDeletions,
       avgTimeToMergeHours: avgTimeToMergeHours
@@ -264,19 +297,25 @@ export class PullRequestsService {
       orderBy: { createdAt: 'asc' },
     });
 
-    // Bucket by ISO week
-    const weekMap = new Map<string, { opened: number; merged: number; closed: number }>();
+    const weekMap = new Map<
+      string,
+      { opened: number; merged: number; closed: number }
+    >();
 
     const toWeekKey = (date: Date) => {
       const d = new Date(date);
       d.setHours(0, 0, 0, 0);
-      d.setDate(d.getDate() - d.getDay()); // start of week (Sunday)
+      d.setDate(d.getDate() - d.getDay());
       return d.toISOString().slice(0, 10);
     };
 
     for (const pr of prs) {
       const openKey = toWeekKey(pr.createdAt);
-      const bucket = weekMap.get(openKey) ?? { opened: 0, merged: 0, closed: 0 };
+      const bucket = weekMap.get(openKey) ?? {
+        opened: 0,
+        merged: 0,
+        closed: 0,
+      };
       bucket.opened++;
       weekMap.set(openKey, bucket);
 
@@ -321,7 +360,7 @@ export class PullRequestsService {
     ]);
 
     return PaginatedResponseDto.of(
-      stats.map(s => ({
+      stats.map((s) => ({
         id: s.id,
         reviewerLogin: s.reviewerLogin,
         reviewCount: s.reviewCount,
@@ -334,32 +373,19 @@ export class PullRequestsService {
     );
   }
 
-  // Helpers
-
-  private async assertOwnership(repositoryId: string, userId: string): Promise<void> {
+  private async assertOwnership(
+    repositoryId: string,
+    userId: string,
+  ): Promise<void> {
     const repo = await this.prisma.repository.findFirst({
       where: { id: repositoryId, userId },
       select: { id: true },
     });
-    if (!repo) throw new NotFoundException(`Repository ${repositoryId} not found`);
+    if (!repo)
+      throw new NotFoundException(`Repository ${repositoryId} not found`);
   }
 
-  private toPRDto(p: {
-    id: string;
-    externalId: number;
-    title: string;
-    state: string;
-    isDraft: boolean;
-    additions: number;
-    deletions: number;
-    changedFiles: number;
-    commitsInPR: number;
-    createdAt: Date;
-    updatedAt: Date;
-    mergedAt: Date | null;
-    closedAt: Date | null;
-    targetBranchId: string | null;
-  }): PullRequestResponseDto {
+  private toPRDto(p: any): PullRequestResponseDto {
     return {
       id: p.id,
       externalId: p.externalId,

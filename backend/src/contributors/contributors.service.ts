@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Octokit } from 'octokit';
+import { GithubStatsService } from '../shared/github-stats.service';
 import {
   GetContributorsDto,
   SyncContributorsDto,
@@ -17,9 +18,10 @@ import { SortOrder } from '../common/dto/sort.dto';
 export class ContributorsService {
   private readonly logger = new Logger(ContributorsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
-
-  // ─── Sync ──────────────────────────────────────────────────────────────────
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly githubStats: GithubStatsService
+  ) {}
 
   async syncForRepo(dto: SyncContributorsDto): Promise<void> {
     const { repositoryId, fullName, gitHubToken } = dto;
@@ -28,13 +30,14 @@ export class ContributorsService {
 
     this.logger.log(`Syncing contributors for ${fullName}`);
 
-    const stats = await this.fetchWithRetry(octokit, owner, repo, fullName);
+    const stats = await this.githubStats.getContributorStats(octokit, owner, repo);
     if (!stats.length) return;
 
     const repoTotal = stats.reduce((sum, c) => sum + (c.total ?? 0), 0);
 
     for (const contributor of stats) {
-      if (!contributor.author?.login) continue;
+      const login = contributor.author?.login;
+      if (!login) continue;
 
       const weeks = contributor.weeks ?? [];
       const additions = weeks.reduce((s: number, w: any) => s + (w.a ?? 0), 0);
@@ -51,9 +54,9 @@ export class ContributorsService {
         repoTotal > 0 ? Math.round((totalCommits / repoTotal) * 10000) / 100 : 0;
 
       await this.prisma.contributor.upsert({
-        where: { repositoryId_login: { repositoryId, login: contributor.author.login } },
+        where: { repositoryId_login: { repositoryId, login } },
         update: {
-          avatarUrl: contributor.author.avatar_url ?? null,
+          avatarUrl: contributor.author?.avatar_url ?? null,
           totalCommits,
           totalAdditions: additions,
           totalDeletions: deletions,
@@ -62,8 +65,8 @@ export class ContributorsService {
           lastCommitAt,
         },
         create: {
-          login: contributor.author.login,
-          avatarUrl: contributor.author.avatar_url ?? null,
+          login,
+          avatarUrl: contributor.author?.avatar_url ?? null,
           totalCommits,
           totalAdditions: additions,
           totalDeletions: deletions,
@@ -77,7 +80,6 @@ export class ContributorsService {
 
     this.logger.log(`Synced ${stats.length} contributors for ${fullName}`);
   }
-
 
   async getContributors(
     repositoryId: string,
@@ -105,7 +107,6 @@ export class ContributorsService {
   async getBusFactor(repositoryId: string, userId: string): Promise<BusFactorResponseDto> {
     await this.assertOwnership(repositoryId, userId);
 
-    // No pagination here — we need all contributors to compute the correct %
     const contributors = await this.prisma.contributor.findMany({
       where: { repositoryId },
       orderBy: { totalCommits: 'desc' },
@@ -169,8 +170,6 @@ export class ContributorsService {
     return { repoAId: dto.repoAId, repoBId: dto.repoBId, shared, onlyInA, onlyInB };
   }
 
-  // ─── Bus factor (also used by analysis service) ───────────────────────────
-
   computeBusFactor(
     contributors: Array<{
       login: string;
@@ -206,32 +205,6 @@ export class ContributorsService {
     return { busFactor, riskLevel, ownershipBreakdown, totalContributors: contributors.length };
   }
 
-  // ─── Helpers ───────────────────────────────────────────────────────────────
-
-  private async fetchWithRetry(
-    octokit: Octokit,
-    owner: string,
-    repo: string,
-    fullName: string,
-  ): Promise<any[]> {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const res = await octokit.rest.repos.getContributorsStats({ owner, repo });
-
-        if (res.status === 202) {
-          this.logger.debug(`GitHub computing stats for ${fullName}, retry ${attempt + 1}/3`);
-          await new Promise(r => setTimeout(r, 3000 * (attempt + 1)));
-          continue;
-        }
-
-        return Array.isArray(res.data) ? res.data : [];
-      } catch (e) {
-        this.logger.error(`Contributor fetch failed for ${fullName} (attempt ${attempt + 1}): ${e}`);
-      }
-    }
-    return [];
-  }
-
   private async assertOwnership(repositoryId: string, userId: string): Promise<void> {
     const repo = await this.prisma.repository.findFirst({
       where: { id: repositoryId, userId },
@@ -240,17 +213,7 @@ export class ContributorsService {
     if (!repo) throw new NotFoundException(`Repository ${repositoryId} not found`);
   }
 
-  private toDto(c: {
-    id: string;
-    login: string;
-    avatarUrl: string | null;
-    totalCommits: number;
-    totalAdditions: number;
-    totalDeletions: number;
-    commitPercent: number;
-    firstCommitAt: Date | null;
-    lastCommitAt: Date | null;
-  }): ContributorResponseDto {
+  private toDto(c: any): ContributorResponseDto {
     return {
       id: c.id,
       login: c.login,
