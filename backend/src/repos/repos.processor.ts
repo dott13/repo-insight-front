@@ -211,67 +211,56 @@ export class ReposProcessor {
     this.logger.log(`Finished processing ${repo.fullName}`);
   }
 
-  private async updateRepoAggregates(
-    repositoryId: string,
-    userLogin: string,
-  ): Promise<void> {
-    const branches = await this.prisma.branch.findMany({
-      where: { repositoryId },
-      select: { userCommits: true, userAdditions: true, userDeletions: true },
-    });
-
-    const prGroups = await this.prisma.pullRequest.groupBy({
-      by: ['state'],
-      where: { repositoryId },
-      _count: { _all: true },
-    });
-
-    const contributors = await this.prisma.contributor.findMany({
-      where: { repositoryId },
-      select: {
-        login: true,
-        totalCommits: true,
-        totalAdditions: true,
-        totalDeletions: true,
-        commitPercent: true,
-      },
-    });
-
-    const totalCommits = branches.reduce((s, b) => s + b.userCommits, 0);
-    const totalAdditions = branches.reduce((s, b) => s + b.userAdditions, 0);
-    const totalDeletions = branches.reduce((s, b) => s + b.userDeletions, 0);
-
-    const prByState = Object.fromEntries(
-      prGroups.map((p) => [p.state, p._count._all]),
-    );
-    const totalPRs = Object.values(prByState).reduce((s, c) => s + c, 0);
-    const mergedPRs = prByState['merged'] ?? 0;
-    const openPRs = prByState['open'] ?? 0;
-    const closedPRs = prByState['closed'] ?? 0;
-
-    const userContributor = contributors.find(
-      (c) => c.login.toLowerCase() === userLogin.toLowerCase(),
-    );
+   private async updateRepoAggregates(repositoryId: string, userLogin: string): Promise<void> {
+    const [contributors, prGroups] = await Promise.all([
+      this.prisma.contributor.findMany({
+        where: { repositoryId },
+        select: {
+          login: true,
+          totalCommits: true,
+          totalAdditions: true,
+          totalDeletions: true,
+          commitPercent: true,
+        },
+        orderBy: { totalCommits: 'desc' },
+      }),
+      this.prisma.pullRequest.groupBy({
+        by: ['state'],
+        where: { repositoryId },
+        _count: { _all: true },
+      }),
+    ]);
+ 
+    const repoTotalCommits = contributors.reduce((s, c) => s + c.totalCommits, 0);
+    const repoTotalAdditions = contributors.reduce((s, c) => s + c.totalAdditions, 0);
+    const repoTotalDeletions = contributors.reduce((s, c) => s + c.totalDeletions, 0);
+ 
+    const userContributor =
+      contributors.find(c => c.login.toLowerCase() === userLogin.toLowerCase()) ??
+      contributors.find(c => c.login.toLowerCase().includes(userLogin.toLowerCase()));
+ 
     const contributionScore = userContributor
       ? userContributor.totalCommits * 10 +
-        Math.floor(
-          (userContributor.totalAdditions + userContributor.totalDeletions) /
-            100,
-        )
+        Math.floor((userContributor.totalAdditions + userContributor.totalDeletions) / 100)
       : 0;
-
+ 
+    const prByState  = Object.fromEntries(prGroups.map(p => [p.state, p._count._all]));
+    const totalPRs   = Object.values(prByState).reduce((s, c) => s + c, 0);
+    const mergedPRs  = prByState['merged'] ?? 0;
+    const openPRs    = prByState['open']   ?? 0;
+    const closedPRs  = prByState['closed'] ?? 0;
+ 
     await this.prisma.repository.update({
       where: { id: repositoryId },
       data: {
-        totalCommits,
-        totalAdditions,
-        totalDeletions,
+        totalCommits:    repoTotalCommits,
+        totalAdditions:  repoTotalAdditions,
+        totalDeletions:  repoTotalDeletions,
         totalPRs,
         mergedPRs,
         openPRs,
         closedPRs,
-        prMergeRate:
-          totalPRs > 0 ? Math.round((mergedPRs / totalPRs) * 10000) / 100 : 0,
+        prMergeRate: totalPRs > 0 ? Math.round((mergedPRs / totalPRs) * 10000) / 100 : 0,
         contributionScore,
         lastParsed: new Date(),
       },
