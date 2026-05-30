@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Body, Param, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Req, Query } from '@nestjs/common';
 import { ReposService } from './repos.service';
 import { SyncReposDto } from './dto/sync-repo.dto';
+import { GetReposListDto } from './dto/repos-list.dto';
 
 @Controller('repos')
 export class ReposController {
@@ -23,6 +24,14 @@ export class ReposController {
   @Get()
   getUserRepos(@Req() req: any) {
     return this.reposService.getUserRepos(req.user.id);
+  }
+  /*
+   GET /repos/list
+   Paginated, sortable repo list for the authenticated user.
+  */
+  @Get('list')
+  getReposList(@Query() dto: GetReposListDto, @Req() req: any) {
+    return this.reposService.getReposList(req.user.id, dto);
   }
 
   /*

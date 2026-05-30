@@ -1,21 +1,18 @@
 import { Link } from "@tanstack/react-router";
-import { MdDashboard, MdHome, MdSettings, MdTimeline } from "react-icons/md";
-import { useHomeTable } from "@/hooks/useHomeService";
+import { MdDashboard, MdHome, MdSettings, MdTimeline, MdOutlineStorage } from "react-icons/md";
+import { useReposList } from "@/hooks/useReposList";
 
 export function SideBar({ isOpen }: { isOpen: boolean }) {
-  const { rows } = useHomeTable();
+  const { items } = useReposList();
+  const defaultRepoId = items[0]?.id ?? null;
 
-  const randomRepoId = rows.length > 0 
-    ? rows[Math.floor(Math.random() * rows.length)].id.toString()
-    : null;
-  console.log("Randomly selected repoId for dashboard link:", randomRepoId);
   return (
     <aside
       className={`sidebar-transition border-zinc-800 bg-zinc-950 border-r ${isOpen ? 'sidebar-open' : 'sidebar-closed'}`}
     >
       <div className="w-64 flex flex-col h-full justify-between">
         <nav className="flex-1 px-3 py-4 space-y-1">
-          
+
           <Link
             to="/"
             activeProps={{ className: "bg-zinc-900 text-white" }}
@@ -27,18 +24,26 @@ export function SideBar({ isOpen }: { isOpen: boolean }) {
           </Link>
 
           <Link
-            to="/repos/$repoId"
-            onClick={(e) => {console.log("Dashboard link clicked with repoId:", randomRepoId)}}
-            params={{ repoId: randomRepoId ?? "no-repos-loaded" }}
-            disabled={!randomRepoId}
+            to={defaultRepoId ? "/repos/$repoId" : "/repos"}
+            params={defaultRepoId ? { repoId: defaultRepoId } : undefined}
+            activeOptions={{ exact: false }}
             activeProps={{ className: "bg-zinc-900 text-white" }}
             inactiveProps={{ className: "text-zinc-200 hover:text-zinc-100 hover:bg-zinc-900/50" }}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all duration-200 group ${!randomRepoId ? 'opacity-40 cursor-not-allowed' : ''}`}
+            className="flex items-center gap-3 rounded-lg px-3 py-2 transition-all duration-200 group"
           >
             <MdDashboard className="text-xl shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="text-sm font-medium">
-              {!randomRepoId ? "Loading Dashboard..." : "Dashboard"}
-            </span>
+            <span className="text-sm font-medium">Dashboard</span>
+          </Link>
+
+          <Link
+            to="/repos"
+            activeOptions={{ exact: true }}
+            activeProps={{ className: "bg-zinc-900 text-white" }}
+            inactiveProps={{ className: "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50" }}
+            className="flex items-center gap-3 rounded-lg px-3 py-2 pl-9 transition-all duration-200 group"
+          >
+            <MdOutlineStorage className="text-base shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="text-xs font-medium">All Repositories</span>
           </Link>
 
           <Link
@@ -52,7 +57,7 @@ export function SideBar({ isOpen }: { isOpen: boolean }) {
           </Link>
 
         </nav>
-        
+
         <div className="p-4 mt-auto border-t border-zinc-800">
           <Link
             to="/settings"

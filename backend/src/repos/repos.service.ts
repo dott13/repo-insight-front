@@ -7,6 +7,8 @@ import { GitParserService } from './git-parser.service';
 import { SyncReposDto } from './dto/sync-repo.dto';
 import { Repo } from './entities/repo.entity';
 import { Repository } from '@prisma/client';
+import { PaginatedResponseDto } from '../common/dto/pagination.dto';
+import { GetReposListDto, RepoListItemDto, RepoSortField, SortOrder } from './dto/repos-list.dto';
 
 @Injectable()
 export class ReposService {
@@ -163,6 +165,81 @@ export class ReposService {
     this.logger.log(`Sync complete — ${projectMap.size} projects found`);
     return results;
   }
+
+  async getReposList(
+  userId: string,
+  dto: GetReposListDto,
+): Promise<PaginatedResponseDto<RepoListItemDto>> {
+  const where: any = { userId };
+ 
+  // Search across fullName and description
+  if (dto.search?.trim()) {
+    where.OR = [
+      { fullName: { contains: dto.search, mode: 'insensitive' } },
+      { description: { contains: dto.search, mode: 'insensitive' } },
+    ];
+  }
+  
+  if (dto.localOnly)  where.isLocal  = true;
+  if (dto.remoteOnly) where.isRemote = true;
+  if (dto.provider)   where.provider = dto.provider;
+ 
+  const orderBy = {
+    [dto.sortBy ?? RepoSortField.SCORE]: dto.order ?? SortOrder.DESC,
+  };
+  
+  this.logger.log(`Fetching repos list for user ${userId} with filters: ${JSON.stringify(dto)}`);
+
+  const [repos, total] = await Promise.all([
+    this.prisma.repository.findMany({
+      where,
+      orderBy,
+      skip: dto.skip,
+      take: dto.limit,
+      include: {
+        _count: {
+          select: { contributors: true, branches: true },
+        },
+        branches: {
+          where:   { lastCommitAt: { not: null } },
+          orderBy: { lastCommitAt: 'desc' },
+          take:    1,
+          select:  { lastCommitAt: true },
+        },
+      },
+    }),
+    this.prisma.repository.count({ where }),
+  ]);
+ 
+  const items: RepoListItemDto[] = repos.map(r => ({
+    id:                r.id,
+    fullName:          r.fullName,
+    name:              r.name,
+    description:       r.description,
+    htmlUrl:           r.htmlUrl,
+    provider:          r.provider,
+    isLocal:           r.isLocal,
+    isRemote:          r.isRemote,
+    isContributed:     r.isContributed,
+    contributionScore: r.contributionScore,
+    totalCommits:      r.totalCommits,
+    totalAdditions:    r.totalAdditions,
+    totalDeletions:    r.totalDeletions,
+    totalPRs:          r.totalPRs,
+    mergedPRs:         r.mergedPRs,
+    openPRs:           r.openPRs,
+    prMergeRate:       r.prMergeRate,
+    contributorCount:  r._count.contributors,
+    branchCount:       r._count.branches,
+    lastContributedAt: r.branches[0]?.lastCommitAt ?? null,
+    lastParsed:        r.lastParsed,
+    createdAt:         r.createdAt,
+  }));
+  
+  this.logger.log(`Fetched ${items.length} repos for user ${userId} (total: ${total}) with filters: ${JSON.stringify(dto)}`);
+  
+  return PaginatedResponseDto.of(items, total, dto);
+}
 
   async getUserRepos(userId: string): Promise<Repository[]> {
     return this.prisma.repository.findMany({

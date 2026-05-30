@@ -12,7 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as GraphRouteImport } from './routes/graph'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ReposRepoIdRouteImport } from './routes/repos.$repoId'
+import { Route as ReposIndexRouteImport } from './routes/repos/index'
+import { Route as ReposRepoIdRouteImport } from './routes/repos/$repoId'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -29,6 +30,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReposIndexRoute = ReposIndexRouteImport.update({
+  id: '/repos/',
+  path: '/repos/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReposRepoIdRoute = ReposRepoIdRouteImport.update({
   id: '/repos/$repoId',
   path: '/repos/$repoId',
@@ -40,12 +46,14 @@ export interface FileRoutesByFullPath {
   '/graph': typeof GraphRoute
   '/settings': typeof SettingsRoute
   '/repos/$repoId': typeof ReposRepoIdRoute
+  '/repos/': typeof ReposIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/graph': typeof GraphRoute
   '/settings': typeof SettingsRoute
   '/repos/$repoId': typeof ReposRepoIdRoute
+  '/repos': typeof ReposIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,14 @@ export interface FileRoutesById {
   '/graph': typeof GraphRoute
   '/settings': typeof SettingsRoute
   '/repos/$repoId': typeof ReposRepoIdRoute
+  '/repos/': typeof ReposIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/graph' | '/settings' | '/repos/$repoId'
+  fullPaths: '/' | '/graph' | '/settings' | '/repos/$repoId' | '/repos/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/graph' | '/settings' | '/repos/$repoId'
-  id: '__root__' | '/' | '/graph' | '/settings' | '/repos/$repoId'
+  to: '/' | '/graph' | '/settings' | '/repos/$repoId' | '/repos'
+  id: '__root__' | '/' | '/graph' | '/settings' | '/repos/$repoId' | '/repos/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +76,7 @@ export interface RootRouteChildren {
   GraphRoute: typeof GraphRoute
   SettingsRoute: typeof SettingsRoute
   ReposRepoIdRoute: typeof ReposRepoIdRoute
+  ReposIndexRoute: typeof ReposIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -92,6 +102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/repos/': {
+      id: '/repos/'
+      path: '/repos'
+      fullPath: '/repos/'
+      preLoaderRoute: typeof ReposIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/repos/$repoId': {
       id: '/repos/$repoId'
       path: '/repos/$repoId'
@@ -107,6 +124,7 @@ const rootRouteChildren: RootRouteChildren = {
   GraphRoute: GraphRoute,
   SettingsRoute: SettingsRoute,
   ReposRepoIdRoute: ReposRepoIdRoute,
+  ReposIndexRoute: ReposIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
