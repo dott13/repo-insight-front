@@ -18,6 +18,8 @@ interface RepoJobData {
   repos: Array<{ id: string; fullName: string }>;
 }
 
+const STALE_THRESHOLD_DAYS = 15;
+
 @Processor('repos')
 export class ReposProcessor {
   private readonly logger = new Logger(ReposProcessor.name);
@@ -41,6 +43,22 @@ export class ReposProcessor {
 
     const limit = pLimit(2);
 
+    const octokit = new Octokit({ auth: gitHubToken });
+
+    const { active, stale} = await this.partitionByActivity(octokit, repos);
+
+    if (stale.length > 0) {
+      this.logger.log(`Skipping ${stale.length} stale repos (no activity in ${STALE_THRESHOLD_DAYS} days): ` + 
+        stale.map(r => r.fullName).join(', ')
+      );
+      
+      for (const repo of stale) {
+        this.gateway.emitScoreUpdate(userId, repo.id);
+      }
+    }
+
+    this.logger.log(`Processing ${active.length} active repos for user ${userId}`);
+
     await Promise.allSettled(
       repos.map((repo) =>
         limit(async () => {
@@ -61,6 +79,65 @@ export class ReposProcessor {
 
     this.gateway.emitSyncComplete(userId, repos.length);
     this.logger.log(`Deep sync completely evaluated for user ${userId}`);
+  }
+
+  private async partitionByActivity(
+    octokit: Octokit,
+    repos: Array<{ id: string; fullName: string }>,
+  ): Promise<{ 
+    active: Array<{ id: string; fullName: string }>;
+    stale: Array<{ id: string; fullName: string }>;
+  }> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - STALE_THRESHOLD_DAYS);
+
+    const dbRepos = await this.prisma.repository.findMany({
+      where: { id: { in: repos.map(r => r.id) } },
+      select: { id: true, lastParsed: true },
+    });
+
+    const lastParsedMap = new Map(dbRepos.map(r => [r.id, r.lastParsed]));
+
+    const limit = pLimit(10);
+
+    const results = await Promise.all(
+      repos.map( repo => limit(async () => {
+        const lastParsed = lastParsedMap.get(repo.id);
+
+        if (!lastParsed) return { repo, active: true, reason: 'never synced'};
+
+        try {
+          const [owner, repoName] = repo.fullName.split('/');
+          const { data } = await octokit.rest.repos.get({owner, repo: repoName});
+          const pushedAt = data.pushed_at ? new Date(data.pushed_at) : null;
+
+          if (!pushedAt || pushedAt > cutoff) {
+            return { repo, active: true, reason: `pushed ${pushedAt?.toDateString()}` };
+          }
+
+          const sevenDaysAgo = new Date();
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+          if ( lastParsed < sevenDaysAgo && pushedAt > lastParsed) { 
+            return { repo, active: true, reason: `db data outdated` };
+          }
+
+          return { repo, active: false, reason: `stale (pushed ${pushedAt?.toDateString()}, lastParsed ${lastParsed.toDateString()})` };
+        } catch (e) {
+          this.logger.warn(`Could not check activity for ${repo.fullName}, including in sync: ${e instanceof Error ? e.message : String(e)}`);
+          return { repo, active: true, reason: 'error checking activity' };
+        }
+      })
+      ),
+    );
+
+    results.forEach(r => 
+      this.logger.debug(`${r.repo.fullName}: ${r.active ? 'ACTIVE' : 'STALE'} (${r.reason})`)
+    )
+
+    return {
+      active: results.filter(r => r.active).map(r => r.repo),
+      stale: results.filter(r => !r.active).map(r => r.repo),
+    };
   }
 
   private async processRepo(
