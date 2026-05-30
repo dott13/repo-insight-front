@@ -50,11 +50,22 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     ...init,
     headers: { ...headers, ...(init?.headers ?? {}) },
   });
-
+ 
   const text = await res.text();
-  if (!res.ok) throw new Error(`API Error (${res.status}): ${text}`);
-
-  return JSON.parse(text) as T;
+ 
+  if (!res.ok) {
+    throw new Error(`API Error (${res.status}): ${text}`);
+  }
+ 
+  if (!text || !text.trim()) {
+    throw new Error(`API Error (${res.status}): empty response from ${path}`);
+  }
+ 
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`API Error: invalid JSON from ${path} — ${text.slice(0, 100)}`);
+  }
 }
 
 // Repo Service 
