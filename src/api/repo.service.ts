@@ -94,7 +94,7 @@ export const repoService = {
 
     console.debug(`[repoService] Scanned ${localPaths.length} local repos from ${baseDir}`);
 
-    return apiFetch<Repository[]>("/repos/sync", {
+    return apiFetch<Repository[]>("/repos/sync-forced", {
       method: "POST",
       body: JSON.stringify({
         localPaths,

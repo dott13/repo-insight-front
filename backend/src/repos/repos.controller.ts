@@ -18,6 +18,16 @@ export class ReposController {
   }
 
   /*
+   POST /repos/sync-forced
+   Triggers full sync and skips the 15-day activity staleness filter 
+   for testing/deep debugging purposes.
+  */
+  @Post('sync-forced')
+  syncForced(@Body() dto: SyncReposDto) {
+    return this.reposService.syncUserProjects(dto, true);
+  }
+
+  /*
    GET /repos
    All repos for the authenticated user, ordered by contribution score.
   */

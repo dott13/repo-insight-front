@@ -1,10 +1,18 @@
-import { Link } from "@tanstack/react-router";
-import { MdDashboard, MdHome, MdSettings, MdTimeline, MdOutlineStorage } from "react-icons/md";
+import { Link, useRouterState } from "@tanstack/react-router";
+import { MdDashboard, MdHome, MdSettings, MdTimeline, MdOutlineStorage, MdInsights } from "react-icons/md";
 import { useReposList } from "@/hooks/useReposList";
 
 export function SideBar({ isOpen }: { isOpen: boolean }) {
   const { items } = useReposList();
   const defaultRepoId = items[0]?.id ?? null;
+
+  const routerState = useRouterState();
+  const pathname = routerState.location.pathname;
+
+  const pathParts = pathname.split('/');
+  const reposIndex = pathParts.indexOf('repos');
+  const extractedId = reposIndex !== -1 && pathParts[reposIndex + 1] ? pathParts[reposIndex + 1] : null;
+  const activeRepoId = extractedId && extractedId !== 'list' ? extractedId : defaultRepoId;
 
   return (
     <aside
@@ -34,6 +42,21 @@ export function SideBar({ isOpen }: { isOpen: boolean }) {
             <MdDashboard className="text-xl shrink-0 group-hover:scale-110 transition-transform" />
             <span className="text-sm font-medium">Dashboard</span>
           </Link>
+
+          {activeRepoId && (
+            <Link
+              to="/repos/$repoId/analysis"
+              params={{ repoId: activeRepoId }}
+              search={{ section: 'commits', tab: 'overview' }}
+              activeOptions={{ exact: false }}
+              activeProps={{ className: "bg-zinc-900 text-white" }}
+              inactiveProps={{ className: "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50" }}
+              className="flex items-center gap-3 rounded-lg px-3 py-2 pl-9 transition-all duration-200 group"
+            >
+              <MdInsights className="text-base shrink-0 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-medium">Analysis</span>
+            </Link>
+          )}
 
           <Link
             to="/repos"
