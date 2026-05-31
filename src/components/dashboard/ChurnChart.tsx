@@ -1,3 +1,4 @@
+import { formatWeekLabel } from '@/hooks/useDashboardService'
 import { TileLabel } from '../shared/TilePrimitives'
 import {
   BarChart,
@@ -62,6 +63,7 @@ export function ChurnChart({ data }: ChurnChartProps) {
               axisLine={false}
               tickLine={false}
               interval="preserveStartEnd"
+              tickFormatter={formatWeekLabel}
             />
             <YAxis
               tick={{ fill: '#52525b', fontSize: 9, fontFamily: 'monospace' }}

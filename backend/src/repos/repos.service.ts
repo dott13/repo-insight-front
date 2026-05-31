@@ -20,7 +20,7 @@ export class ReposService {
     @InjectQueue('repos') private readonly reposQueue: Queue,
   ) {}
 
-  async syncUserProjects(dto: SyncReposDto): Promise<Repository[]> {
+  async syncUserProjects(dto: SyncReposDto, forceAll = false): Promise<Repository[]> {
     const {
       localPaths,
       userEmail,
@@ -149,7 +149,7 @@ export class ReposService {
       if (remoteRepos.length > 0) {
         await this.reposQueue.add(
           'calculate-scores',
-          { userId, gitHubToken, userLogin, repos: remoteRepos },
+          { userId, gitHubToken, userLogin, repos: remoteRepos, forceAll },
           {
             attempts: 3,
             backoff: { type: 'exponential', delay: 5000 },

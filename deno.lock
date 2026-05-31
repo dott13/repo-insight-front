@@ -4,6 +4,7 @@
     "npm:@fontsource-variable/inter@^5.2.8": "5.2.8",
     "npm:@supabase/supabase-js@^2.104.1": "2.104.1",
     "npm:@tailwindcss/vite@^4.2.2": "4.2.2_vite@7.3.1",
+    "npm:@tanstack/react-query@^5.100.14": "5.100.14_react@19.2.4",
     "npm:@tanstack/react-router@^1.168.2": "1.168.2_react@19.2.4_react-dom@19.2.4__react@19.2.4",
     "npm:@tanstack/router-plugin@^1.167.3": "1.167.3_@tanstack+react-router@1.168.2__react@19.2.4__react-dom@19.2.4___react@19.2.4_vite@7.3.1",
     "npm:@tauri-apps/api@2": "2.10.1",
@@ -1902,6 +1903,16 @@
     },
     "@tanstack/history@1.161.6": {
       "integrity": "sha512-NaOGLRrddszbQj9upGat6HG/4TKvXLvu+osAIgfxPYA+eIvYKv8GKDJOrY2D3/U9MRnKfMWD7bU4jeD4xmqyIg=="
+    },
+    "@tanstack/query-core@5.100.14": {
+      "integrity": "sha512-5X41dGpxgeaHISCRW2oYwcSycZeULZzAunaudXT9ov1KOTj9xwt0CH6hbwqP1/z74ZWF7rYFnDpyYH07XFcZew=="
+    },
+    "@tanstack/react-query@5.100.14_react@19.2.4": {
+      "integrity": "sha512-oOr6aRdSFEwWhzxEkD/9ZcItM3+LjBSkeVmadWKwUssAHTsqd/7bOjWrX4AbvEkoEhgAxzN0Xk6H/aYzXiYBAw==",
+      "dependencies": [
+        "@tanstack/query-core",
+        "react"
+      ]
     },
     "@tanstack/react-router@1.168.2_react@19.2.4_react-dom@19.2.4__react@19.2.4": {
       "integrity": "sha512-zUDRM01m81xDCeTLHuqsvKR9zpf+bdfEhyadcUNSbO1930lIeOKLmMscUUNHWhc7Gqpi/V8Xl85QcJFAIAGmvQ==",
@@ -4339,6 +4350,7 @@
         "npm:@fontsource-variable/inter@^5.2.8",
         "npm:@supabase/supabase-js@^2.104.1",
         "npm:@tailwindcss/vite@^4.2.2",
+        "npm:@tanstack/react-query@^5.100.14",
         "npm:@tanstack/react-router@^1.168.2",
         "npm:@tanstack/router-plugin@^1.167.3",
         "npm:@tauri-apps/api@2",

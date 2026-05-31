@@ -16,6 +16,7 @@ interface RepoJobData {
   gitHubToken: string;
   userLogin: string;
   repos: Array<{ id: string; fullName: string }>;
+  forceAll?: boolean;
 }
 
 const STALE_THRESHOLD_DAYS = 15;
@@ -36,31 +37,36 @@ export class ReposProcessor {
 
   @Process({ name: 'calculate-scores', concurrency: 2 })
   async handleScoreCalculation(job: Job<RepoJobData>): Promise<void> {
-    const { userId, gitHubToken, userLogin, repos } = job.data;
+    const { userId, gitHubToken, userLogin, repos, forceAll = false } = job.data;
     this.logger.log(
-      `Starting clean sync execution for ${repos.length} repos (user: ${userId})`,
+      `Starting execution for ${repos.length} repos (user: ${userId}) — Forced: ${forceAll}`,
     );
 
     const limit = pLimit(2);
+    let activeRepos = repos;
 
-    const octokit = new Octokit({ auth: gitHubToken });
+    if (!forceAll) {
+      const octokit = new Octokit({ auth: gitHubToken });
+      const { active, stale } = await this.partitionByActivity(octokit, repos);
+      activeRepos = active;
 
-    const { active, stale} = await this.partitionByActivity(octokit, repos);
-
-    if (stale.length > 0) {
-      this.logger.log(`Skipping ${stale.length} stale repos (no activity in ${STALE_THRESHOLD_DAYS} days): ` + 
-        stale.map(r => r.fullName).join(', ')
-      );
-      
-      for (const repo of stale) {
-        this.gateway.emitScoreUpdate(userId, repo.id);
+      if (stale.length > 0) {
+        this.logger.log(`Skipping ${stale.length} stale repos (no activity): ` + 
+          stale.map(r => r.fullName).join(', ')
+        );
+        
+        for (const repo of stale) {
+          this.gateway.emitScoreUpdate(userId, repo.id);
+        }
       }
+    } else {
+      this.logger.log(`Bypassing activity validation filters. Processing ALL ${repos.length} repositories.`);
     }
 
-    this.logger.log(`Processing ${active.length} active repos for user ${userId}`);
+    this.logger.log(`Processing ${activeRepos.length} repos for user ${userId}`);
 
     await Promise.allSettled(
-      repos.map((repo) =>
+      activeRepos.map((repo) =>
         limit(async () => {
           try {
             await this.processRepo(repo, gitHubToken, userLogin);
@@ -78,7 +84,7 @@ export class ReposProcessor {
     );
 
     this.gateway.emitSyncComplete(userId, repos.length);
-    this.logger.log(`Deep sync completely evaluated for user ${userId}`);
+    this.logger.log(`Deep sync evaluation completed for user ${userId}`);
   }
 
   private async partitionByActivity(

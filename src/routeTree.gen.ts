@@ -14,6 +14,8 @@ import { Route as GraphRouteImport } from './routes/graph'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReposIndexRouteImport } from './routes/repos/index'
 import { Route as ReposRepoIdRouteImport } from './routes/repos/$repoId'
+import { Route as ReposRepoIdIndexRouteImport } from './routes/repos/$repoId/index'
+import { Route as ReposRepoIdAnalysisRouteImport } from './routes/repos/$repoId/analysis'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -40,42 +42,78 @@ const ReposRepoIdRoute = ReposRepoIdRouteImport.update({
   path: '/repos/$repoId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReposRepoIdIndexRoute = ReposRepoIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ReposRepoIdRoute,
+} as any)
+const ReposRepoIdAnalysisRoute = ReposRepoIdAnalysisRouteImport.update({
+  id: '/analysis',
+  path: '/analysis',
+  getParentRoute: () => ReposRepoIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/graph': typeof GraphRoute
   '/settings': typeof SettingsRoute
-  '/repos/$repoId': typeof ReposRepoIdRoute
+  '/repos/$repoId': typeof ReposRepoIdRouteWithChildren
   '/repos/': typeof ReposIndexRoute
+  '/repos/$repoId/analysis': typeof ReposRepoIdAnalysisRoute
+  '/repos/$repoId/': typeof ReposRepoIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/graph': typeof GraphRoute
   '/settings': typeof SettingsRoute
-  '/repos/$repoId': typeof ReposRepoIdRoute
   '/repos': typeof ReposIndexRoute
+  '/repos/$repoId/analysis': typeof ReposRepoIdAnalysisRoute
+  '/repos/$repoId': typeof ReposRepoIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/graph': typeof GraphRoute
   '/settings': typeof SettingsRoute
-  '/repos/$repoId': typeof ReposRepoIdRoute
+  '/repos/$repoId': typeof ReposRepoIdRouteWithChildren
   '/repos/': typeof ReposIndexRoute
+  '/repos/$repoId/analysis': typeof ReposRepoIdAnalysisRoute
+  '/repos/$repoId/': typeof ReposRepoIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/graph' | '/settings' | '/repos/$repoId' | '/repos/'
+  fullPaths:
+    | '/'
+    | '/graph'
+    | '/settings'
+    | '/repos/$repoId'
+    | '/repos/'
+    | '/repos/$repoId/analysis'
+    | '/repos/$repoId/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/graph' | '/settings' | '/repos/$repoId' | '/repos'
-  id: '__root__' | '/' | '/graph' | '/settings' | '/repos/$repoId' | '/repos/'
+  to:
+    | '/'
+    | '/graph'
+    | '/settings'
+    | '/repos'
+    | '/repos/$repoId/analysis'
+    | '/repos/$repoId'
+  id:
+    | '__root__'
+    | '/'
+    | '/graph'
+    | '/settings'
+    | '/repos/$repoId'
+    | '/repos/'
+    | '/repos/$repoId/analysis'
+    | '/repos/$repoId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   GraphRoute: typeof GraphRoute
   SettingsRoute: typeof SettingsRoute
-  ReposRepoIdRoute: typeof ReposRepoIdRoute
+  ReposRepoIdRoute: typeof ReposRepoIdRouteWithChildren
   ReposIndexRoute: typeof ReposIndexRoute
 }
 
@@ -116,14 +154,42 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReposRepoIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/repos/$repoId/': {
+      id: '/repos/$repoId/'
+      path: '/'
+      fullPath: '/repos/$repoId/'
+      preLoaderRoute: typeof ReposRepoIdIndexRouteImport
+      parentRoute: typeof ReposRepoIdRoute
+    }
+    '/repos/$repoId/analysis': {
+      id: '/repos/$repoId/analysis'
+      path: '/analysis'
+      fullPath: '/repos/$repoId/analysis'
+      preLoaderRoute: typeof ReposRepoIdAnalysisRouteImport
+      parentRoute: typeof ReposRepoIdRoute
+    }
   }
 }
+
+interface ReposRepoIdRouteChildren {
+  ReposRepoIdAnalysisRoute: typeof ReposRepoIdAnalysisRoute
+  ReposRepoIdIndexRoute: typeof ReposRepoIdIndexRoute
+}
+
+const ReposRepoIdRouteChildren: ReposRepoIdRouteChildren = {
+  ReposRepoIdAnalysisRoute: ReposRepoIdAnalysisRoute,
+  ReposRepoIdIndexRoute: ReposRepoIdIndexRoute,
+}
+
+const ReposRepoIdRouteWithChildren = ReposRepoIdRoute._addFileChildren(
+  ReposRepoIdRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   GraphRoute: GraphRoute,
   SettingsRoute: SettingsRoute,
-  ReposRepoIdRoute: ReposRepoIdRoute,
+  ReposRepoIdRoute: ReposRepoIdRouteWithChildren,
   ReposIndexRoute: ReposIndexRoute,
 }
 export const routeTree = rootRouteImport
