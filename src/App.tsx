@@ -1,4 +1,4 @@
-import { RouterProvider, createRouter } from "@tanstack/react-router";
+import { RouterProvider, createRouter, createHashHistory } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 import "./App.css";
 import { useAuth } from "@/context/AuthContext";
@@ -6,7 +6,10 @@ import { AuthShell } from "./components/auth/AuthShell";
 import { useEffect, useRef } from "react";
 import { repoService } from "./api/repo.service";
 
-const router = createRouter({ routeTree });
+const hashHistory = createHashHistory();
+
+
+export const router = createRouter({ routeTree, history: hashHistory });
 
 declare module "@tanstack/react-router" {
   export interface Register {

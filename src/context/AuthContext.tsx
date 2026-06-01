@@ -6,9 +6,12 @@ import {
   ReactNode,
   useEffect,
   useState,
+  useRef,
 } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { io, Socket } from "socket.io-client";
+import { router } from "@/App";
 
 interface SyncState {
   isSyncing: boolean;
@@ -30,7 +33,6 @@ const AuthContext = createContext<AuthContextType>({
   syncState: { isSyncing: false, syncedRepoIds: new Set(), totalRepos: 0 },
 });
 
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,6 +42,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     syncedRepoIds: new Set(),
     totalRepos: 0,
   });
+  const handledAuthRef = useRef(false);
+
+const handleDeepLinkUrl = async (url: string) => {
+  if (handledAuthRef.current) return;
+  handledAuthRef.current = true;
+
+  try {
+    console.log("[DeepLink] Received URL raw payload:", url);
+    
+    // Split safely on either hash or query parameters without relying on strict URL parsing
+    const normUrl = url.replace("repo-insight://", "");
+    const credentialPart = normUrl.includes("#") ? normUrl.split("#")[1] : normUrl.split("?")[1];
+    
+    if (!credentialPart) {
+      console.warn("[DeepLink] No auth payload token segment discovered.");
+      handledAuthRef.current = false;
+      return;
+    }
+
+    const params = new URLSearchParams(credentialPart);
+    const accessToken = params.get("access_token");
+    const refreshToken = params.get("refresh_token");
+    const providerToken = params.get("provider_token");
+
+    if (accessToken && refreshToken) {
+      console.log("[DeepLink] Attempting Supabase session initialization...");
+      const { error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+
+      if (error) {
+        console.error("[DeepLink] Supabase session assignment failed:", error);
+        handledAuthRef.current = false;
+        return;
+      }
+      
+      console.log("[DeepLink] Supabase session synchronized successfully!");
+      
+      if (providerToken) {
+        localStorage.setItem("provider_token", providerToken);
+      }
+
+      // Defer navigation slightly so App.tsx can mount the RouterProvider 
+      // reactive to the new user state update
+      setTimeout(() => {
+        router.navigate({ to: "/" })
+          .catch((err) => console.error("[DeepLink] TanStack navigation rejected:", err));
+      }, 150);
+
+    } else {
+      console.warn("[DeepLink] Tokens missing from payload parameters.");
+      handledAuthRef.current = false;
+    }
+  } catch (err) {
+    console.error("[DeepLink] Fatal parsing breakdown:", err);
+    handledAuthRef.current = false;
+  }
+};
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -58,40 +119,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const unlistenPromise = listen<string>("deep-link-received", async (event) => {
-      const url = event.payload;
-      if (!url) return;
+    invoke<string | null>("get_pending_deep_link")
+      .then(async (url) => {
+        if (url) {
+          await handleDeepLinkUrl(url);
+        }
+      })
+      .catch(console.error);
+    const unlistenPromise = listen<string>(
+      "deep-link-received",
+      async (event) => {
+        console.log("Deep link received while running:", event.payload);
 
-      // Parse both hash and query string Supabase uses hash, provider token in query
-      const fragment = url.split("#")[1] ?? "";
-      const query = url.split("?")[1]?.split("#")[0] ?? "";
-
-      const hashParams = new URLSearchParams(fragment);
-      const queryParams = new URLSearchParams(query);
-
-      const accessToken = hashParams.get("access_token");
-      const refreshToken = hashParams.get("refresh_token");
-      const providerToken =
-        hashParams.get("provider_token") ?? queryParams.get("provider_token");
-
-      if (accessToken && refreshToken) {
-        const { error } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
-        if (error) console.error("[auth] Error setting session from deep link:", error);
-      }
-
-      if (providerToken) {
-        localStorage.setItem("provider_token", providerToken);
-      }
-    });
+        handledAuthRef.current = false;
+        await handleDeepLinkUrl(event.payload);
+      },
+    );
 
     return () => {
-      unlistenPromise.then((fn) => fn());
+      unlistenPromise.then((unlisten) => unlisten());
     };
   }, []);
-
 
   useEffect(() => {
     if (!user) return;
@@ -111,7 +159,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.debug("[socket] Disconnected:", reason);
     });
 
-    // Fired once per repo as the processor finishes it
     s.on("repo:synced", ({ repoId }: { repoId: string }) => {
       setSyncState((prev) => ({
         ...prev,
@@ -120,7 +167,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }));
     });
 
-    // Fired once when the entire Bull job finishes
     s.on("sync:complete", ({ totalRepos }: { totalRepos: number }) => {
       setSyncState((prev) => ({
         ...prev,

@@ -9,7 +9,7 @@
     "beforeBuildCommand": "deno task build",
     "frontendDist": "../dist"
   },
-  "plugins" :{
+  "plugins": {
     "deep-link": {
       "desktop": {
         "schemes": ["repo-insight"]
@@ -25,18 +25,26 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' ipc: http://ipc.localhost; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+      "csp": "default-src 'self' ipc: http://ipc.localhost; connect-src 'self' https://oxroisbxdikkffwqjyex.supabase.co wss://oxroisbxdikkffwqjyex.supabase.co https://repo-insight-front.onrender.com ws://localhost:*; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     }
   },
   "bundle": {
-    "active": true,
-    "targets": "all",
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
-    ]
+  "active": true,
+  "targets": "all",
+  "icon": [
+    "icons/32x32.png",
+    "icons/128x128.png",
+    "icons/128x128@2x.png",
+    "icons/icon.icns",
+    "icons/icon.ico"
+  ],
+  "linux": {
+    "rpm": {
+      "desktopTemplate": "desktop-template.desktop"
+    },
+    "deb": {
+      "desktopTemplate": "desktop-template.desktop"
+    }
   }
+}
 }

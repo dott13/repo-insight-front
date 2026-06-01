@@ -10,6 +10,7 @@ node_modules/
 
 # dotenv environment variables file
 .env
+/dist
 
 # .vscode workspace settings file
 .vscode/settings.json
