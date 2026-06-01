@@ -25,7 +25,13 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' ipc: http://ipc.localhost; connect-src 'self' https://oxroisbxdikkffwqjyex.supabase.co wss://oxroisbxdikkffwqjyex.supabase.co https://repo-insight-front.onrender.com ws://localhost:*; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+      "csp": {
+        "default-src": "'self' ipc: http://ipc.localhost",
+        "connect-src": "'self' ipc: ipc://localhost http://ipc.localhost https://oxroisbxdikkffwqjyex.supabase.co wss://oxroisbxdikkffwqjyex.supabase.co https://repo-insight-front.onrender.com wss://repo-insight-front.onrender.com http://localhost:* ws://localhost:*",
+        "img-src": "'self' https: data: blob:",
+        "style-src": "'self' 'unsafe-inline'",
+        "script-src": "'self'"
+      }
     }
   },
   "bundle": {
