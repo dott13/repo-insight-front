@@ -16,10 +16,19 @@ import { SharedModule } from './shared/shared.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    BullModule.forRoot({
-      redis: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379', 10),
+    BullModule.forRootAsync({
+      useFactory: () => {
+        if (process.env.REDIS_URL) {
+          return {
+            redis: process.env.REDIS_URL,
+          };
+        }
+        return {
+          redis: {
+            host: process.env.REDIS_HOST || 'localhost',
+            port: parseInt(process.env.REDIS_PORT || '6379', 10),
+          },
+        };
       },
     }),
     SharedModule,
@@ -29,7 +38,8 @@ import { SharedModule } from './shared/shared.module';
     PullRequestsModule,
     CommitStatsModule,
     AnalysisModule,
-    HomeModule],
+    HomeModule
+  ],
   controllers: [AppController],
   providers: [PrismaService, AppService],
 })
