@@ -146,7 +146,7 @@ const handleDeepLinkUrl = async (url: string) => {
 
     const s = io(import.meta.env.VITE_API_URL, {
       query: { userId: user.id },
-      transports: ["websocket"],
+      transports: ["polling", "websocket"],
       reconnectionAttempts: 5,
       reconnectionDelay: 2000,
     });
